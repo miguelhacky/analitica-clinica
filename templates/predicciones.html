@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Predicciones</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #0c4a6e, #1e40af); color: white; position: fixed; height: 100vh; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; margin: 0 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-ml { background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .metric-box { text-align: center; padding: 1.5rem; background: #f8fafc; border-radius: 0.75rem; }
+        .metric-value { font-size: 2rem; font-weight: 700; color: #0c4a6e; }
+        .metric-label { font-size: 0.85rem; color: #64748b; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/etl/"><i class="bi bi-arrow-repeat"></i> ETL</a></div>
+        <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/" class="active"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-0"><i class="bi bi-magic text-primary me-2"></i>Machine Learning - Predicciones</h4>
+                <small class="text-muted">Modelo de predicción de riesgo de enfermedad</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" id="trainModelBtn"><i class="bi bi-gear-fill"></i> Entrenar Modelo</button>
+                <button class="btn btn-success" id="predictAllBtn"><i class="bi bi-lightning-fill"></i> Predecir Todos</button>
+            </div>
+        </div>
+
+        <div class="card-ml mb-4">
+            <div class="row g-3" id="metricsRow">
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="accuracyValue">-</div>
+                        <div class="metric-label">Accuracy</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="precisionValue">-</div>
+                        <div class="metric-label">Precision</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="recallValue">-</div>
+                        <div class="metric-label">Recall</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="f1Value">-</div>
+                        <div class="metric-label">F1-Score</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6"><div class="card-ml"><h6 class="fw-bold mb-3">Matriz de Confusión</h6><div id="confusionMatrix"></div></div></div>
+            <div class="col-md-6"><div class="card-ml"><h6 class="fw-bold mb-3">Distribución de Predicciones</h6><canvas id="prediccionChart"></canvas></div></div>
+        </div>
+
+        <div class="card-ml">
+            <h6 class="fw-bold mb-3"><i class="bi bi-table"></i> Últimas Predicciones</h6>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark"><tr><th>Paciente</th><th>Riesgo</th><th>Probabilidad</th><th>Modelo</th><th>Fecha</th></tr></thead>
+                    <tbody id="prediccionesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        async function apiFetch(url, options = {}) {
+            const token = getToken();
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const r = await fetch(url, { ...options, headers });
+            if (r.status === 401) { window.location.href = '/login/'; return null; }
+            return r;
+        }
+
+        async function loadMetrics() {
+            const r = await apiFetch(`${API}/api/dashboard/kpis/`);
+            if (!r) return;
+            const data = await r.json();
+            if (data.modelo_metrics && data.modelo_metrics.accuracy) {
+                const m = data.modelo_metrics;
+                document.getElementById('accuracyValue').textContent = (m.accuracy * 100).toFixed(1) + '%';
+                document.getElementById('precisionValue').textContent = (m.precision * 100).toFixed(1) + '%';
+                document.getElementById('recallValue').textContent = (m.recall * 100).toFixed(1) + '%';
+                document.getElementById('f1Value').textContent = (m.f1_score * 100).toFixed(1) + '%';
+
+                if (m.confusion_matrix) {
+                    const cm = m.confusion_matrix;
+                    const classes = m.classes || ['Bajo','Medio','Alto','Crítico'];
+                    let html = '<table class="table table-bordered table-sm text-center"><thead><tr><th></th>';
+                    classes.forEach(c => html += `<th class="text-primary">${c}</th>`);
+                    html += '</tr></thead><tbody>';
+                    cm.forEach((row, i) => {
+                        html += `<tr><th class="text-primary">${classes[i] || i}</th>`;
+                        row.forEach(val => html += `<td>${val}</td>`);
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('confusionMatrix').innerHTML = html;
+                }
+            }
+
+            const r2 = await apiFetch(`${API}/api/predicciones/`);
+            if (!r2) return;
+            const preds = await r2.json();
+            const predsList = Array.isArray(preds) ? preds : (preds.results || []);
+            const tbody = document.getElementById('prediccionesBody');
+            const c = {'Bajo':'bg-success','Medio':'bg-warning text-dark','Alto':'bg-orange','Crítico':'bg-danger'};
+            tbody.innerHTML = predsList.slice(0, 20).map(p => `
+                <tr>
+                    <td>${p.paciente_nombre || p.paciente}</td>
+                    <td><span class="badge ${c[p.riesgo_predicho] || 'bg-secondary'}">${p.riesgo_predicho}</span></td>
+                    <td>${(p.probabilidad * 100).toFixed(1)}%</td>
+                    <td>${p.modelo}</td>
+                    <td>${new Date(p.created_at).toLocaleDateString()}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" class="text-muted">Sin predicciones. Ejecute el modelo.</td></tr>';
+
+            if (predsList.length) {
+                const riesgoCount = {};
+                predsList.forEach(p => { riesgoCount[p.riesgo_predicho] = (riesgoCount[p.riesgo_predicho] || 0) + 1; });
+                const colores = {'Bajo':'#10b981','Medio':'#f59e0b','Alto':'#f97316','Crítico':'#ef4444'};
+                new Chart(document.getElementById('prediccionChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(riesgoCount),
+                        datasets: [{ data: Object.values(riesgoCount), backgroundColor: Object.keys(riesgoCount).map(k => colores[k] || '#64748b') }]
+                    },
+                    options: { plugins: { legend: { display: false } } }
+                });
+            }
+        }
+
+        document.getElementById('trainModelBtn').onclick = async function() {
+            this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrenando...';
+            try {
+                const r = await apiFetch(`${API}/api/ml/train/`, { method: 'POST', body: '{}' });
+                if (r) { const data = await r.json(); alert(data.message || 'Modelo entrenado'); loadMetrics(); }
+            } catch(e) { alert('Error al entrenar'); }
+            this.disabled = false; this.innerHTML = '<i class="bi bi-gear-fill"></i> Entrenar Modelo';
+        };
+
+        document.getElementById('predictAllBtn').onclick = async function() {
+            this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Prediciendo...';
+            try {
+                const r = await apiFetch(`${API}/api/ml/predict/`, { method: 'POST', body: '{}' });
+                if (r) { const data = await r.json(); alert(`Predicciones generadas: ${data.predictions?.length || 0}`); loadMetrics(); }
+            } catch(e) { alert('Error al predecir'); }
+            this.disabled = false; this.innerHTML = '<i class="bi bi-lightning-fill"></i> Predecir Todos';
+        };
+
+        document.getElementById('logoutBtn').onclick = e => { e.preventDefault(); localStorage.removeItem('access_token'); window.location.href = '/login/'; };
+
+        loadMetrics();
+    </script>
+</body>
+</html>

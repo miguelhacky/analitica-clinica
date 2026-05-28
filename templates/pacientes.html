@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Pacientes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #0c4a6e, #1e40af); color: white; padding: 0; position: fixed; height: 100vh; overflow-y: auto; z-index: 1000; }
+        .sidebar-header { padding: 1.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+        .sidebar-header i { font-size: 2.5rem; }
+        .nav-item { padding: 0.5rem 1rem; }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .nav-item a i { font-size: 1.2rem; width: 24px; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; width: calc(100% - 260px); }
+        .table-container { background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .badge-riesgo { padding: 0.35rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
+        .badge-bajo { background: #dcfce7; color: #166534; }
+        .badge-medio { background: #fef3c7; color: #92400e; }
+        .badge-alto { background: #fee2e2; color: #991b1b; }
+        .badge-critico { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; font-weight: 700; }
+        .btn-accion { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+        .role-badge { font-size: 0.7rem; padding: 0.2rem 0.6rem; border-radius: 12px; }
+        @media (max-width: 768px) { .sidebar { width: 60px; } .sidebar span, .sidebar h5 { display: none; } .main-content { margin-left: 60px; width: calc(100% - 60px); } }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="bi bi-heart-pulse-fill text-white"></i>
+            <h5 class="text-white mt-2">HealthAnalytics</h5>
+        </div>
+        <div class="mt-2">
+            <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> <span>Dashboard</span></a></div>
+            <div class="nav-item"><a href="/pacientes/" class="active"><i class="bi bi-people-fill"></i> <span>Pacientes</span></a></div>
+            <div class="nav-item"><a href="/etl/"><i class="bi bi-arrow-repeat"></i> <span>ETL</span></a></div>
+            <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> <span>Analítica</span></a></div>
+            <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> <span>Predicciones</span></a></div>
+            <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> <span>Reportes</span></a></div>
+            <hr style="border-color: rgba(255,255,255,0.1)">
+            <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> <span>Cerrar Sesión</span></a></div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-0"><i class="bi bi-people-fill text-primary me-2"></i>Gestión de Pacientes</h4>
+                <small class="text-muted">Listado completo de pacientes registrados</small>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <input type="text" id="searchInput" class="form-control" placeholder="Buscar paciente..." style="width:280px">
+                <span id="userBadge" class="badge bg-primary rounded-pill px-3 py-2"></span>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span id="totalCount" class="text-muted small"></span>
+                <div>
+                    <button class="btn btn-success btn-sm" id="btnNuevoPaciente" style="display:none">
+                        <i class="bi bi-person-plus-fill"></i> Nuevo Paciente
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="pacientesTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th><th>Nombres</th><th>Apellidos</th><th>Edad</th><th>Sexo</th>
+                            <th>IMC</th><th>Glucosa</th><th>Diagnóstico</th><th>Riesgo</th><th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pacientesBody"></tbody>
+                </table>
+            </div>
+            <div id="pagination" class="d-flex justify-content-between align-items-center mt-3"></div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro de eliminar al paciente <strong id="deletePacienteName"></strong>?</p>
+                    <p class="text-danger mb-0"><small>Esta acción no se puede deshacer.</small></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn"><i class="bi bi-trash3-fill"></i> Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-vcard-fill"></i> <span id="detailTitle"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="detailBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        let currentPage = 1;
+        let pageSize = 25;
+        let totalPacientes = 0;
+        let deleteTargetId = null;
+        let userRole = '';
+
+        function getToken() { return localStorage.getItem('access_token'); }
+        function getRefresh() { return localStorage.getItem('refresh_token'); }
+
+        async function apiFetch(url, options = {}) {
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            const token = getToken();
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const r = await fetch(url, { ...options, headers, credentials: 'include' });
+            if (r.status === 401) {
+                const ref = await fetch(`${API}/api/auth/token/refresh/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh: getRefresh() })
+                });
+                if (ref.ok) {
+                    const d = await ref.json();
+                    localStorage.setItem('access_token', d.access);
+                    headers['Authorization'] = `Bearer ${d.access}`;
+                    return fetch(url, { ...options, headers, credentials: 'include' });
+                }
+                window.location.href = '/login/';
+                return null;
+            }
+            return r;
+        }
+
+        function riesgoBadge(riesgo) {
+            const map = { 'Bajo': 'badge-bajo', 'Medio': 'badge-medio', 'Alto': 'badge-alto', 'Crítico': 'badge-critico' };
+            return `<span class="badge ${map[riesgo] || 'bg-secondary'} badge-riesgo">${riesgo}</span>`;
+        }
+
+        async function loadUserRole() {
+            try {
+                const r = await apiFetch(`${API}/api/dashboard/kpis/`);
+                if (!r) return;
+                const d = await r.json();
+                userRole = d.user_role || '';
+                document.getElementById('userBadge').textContent = d.user_email || '';
+                if (userRole === 'Administrador' || userRole === 'Medico') {
+                    document.getElementById('btnNuevoPaciente').style.display = 'inline-block';
+                }
+            } catch(e) {}
+        }
+
+        async function loadPacientes() {
+            const r = await apiFetch(`${API}/api/pacientes/?page=${currentPage}`);
+            if (!r) return;
+            const data = await r.json();
+            const pacientes = data.results || (Array.isArray(data) ? data : []);
+            totalPacientes = data.count || pacientes.length;
+
+            document.getElementById('totalCount').textContent = `Total: ${totalPacientes} pacientes`;
+
+            const tbody = document.getElementById('pacientesBody');
+            const canEdit = userRole === 'Administrador' || userRole === 'Medico';
+            const canDelete = userRole === 'Administrador';
+
+            tbody.innerHTML = pacientes.map(p => `
+                <tr>
+                    <td><span class="fw-semibold">${p.id_paciente}</span></td>
+                    <td>${p.nombres}</td>
+                    <td>${p.apellidos}</td>
+                    <td>${p.edad}</td>
+                    <td>${p.sexo}</td>
+                    <td>${p.IMC || '-'}</td>
+                    <td>${p.glucosa}</td>
+                    <td>${p.diagnostico_preliminar || '-'}</td>
+                    <td>${riesgoBadge(p.riesgo_enfermedad)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info btn-accion" onclick="verDetalle(${p.id})" title="Ver detalle"><i class="bi bi-eye-fill"></i></button>
+                        ${canEdit ? `<a href="/pacientes/${p.id}/editar/" class="btn btn-sm btn-outline-primary btn-accion" title="Editar"><i class="bi bi-pencil-fill"></i></a>` : ''}
+                        ${canDelete ? `<button class="btn btn-sm btn-outline-danger btn-accion" onclick="confirmarEliminar(${p.id}, '${p.nombres} ${p.apellidos}')" title="Eliminar"><i class="bi bi-trash3-fill"></i></button>` : ''}
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="10" class="text-center text-muted py-4">No hay pacientes registrados</td></tr>';
+
+            const pg = document.getElementById('pagination');
+            const totalPages = Math.ceil(totalPacientes / pageSize);
+            pg.innerHTML = `
+                <span class="text-muted small">Página ${currentPage} de ${totalPages || 1}</span>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="prevPage()" ${currentPage <= 1 ? 'disabled' : ''}><i class="bi bi-chevron-left"></i> Anterior</button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="nextPage()" ${currentPage >= totalPages ? 'disabled' : ''}>Siguiente <i class="bi bi-chevron-right"></i></button>
+                </div>
+            `;
+        }
+
+        function prevPage() { if (currentPage > 1) { currentPage--; loadPacientes(); } }
+        function nextPage() { currentPage++; loadPacientes(); }
+
+        document.getElementById('btnNuevoPaciente').onclick = () => window.location.href = '/pacientes/nuevo/';
+
+        function confirmarEliminar(id, nombre) {
+            deleteTargetId = id;
+            document.getElementById('deletePacienteName').textContent = nombre;
+            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+        }
+
+        document.getElementById('confirmDeleteBtn').onclick = async function() {
+            if (!deleteTargetId) return;
+            try {
+                const r = await apiFetch(`${API}/api/pacientes/${deleteTargetId}/`, { method: 'DELETE' });
+                if (r && r.status === 204) {
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                    loadPacientes();
+                } else if (r && r.status === 403) {
+                    alert('No tienes permisos para eliminar pacientes. Solo el Administrador puede hacerlo.');
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                }
+            } catch(e) {}
+            deleteTargetId = null;
+        };
+
+        async function verDetalle(id) {
+            try {
+                const r = await apiFetch(`${API}/api/pacientes/${id}/`);
+                if (!r) return;
+                const p = await r.json();
+                document.getElementById('detailTitle').textContent = `${p.nombres} ${p.apellidos} (${p.id_paciente})`;
+                const riesgoHtml = riesgoBadge(p.riesgo_enfermedad);
+                document.getElementById('detailBody').innerHTML = `
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tr><td class="fw-semibold">ID</td><td>${p.id_paciente}</td></tr>
+                                <tr><td class="fw-semibold">Edad</td><td>${p.edad}</td></tr>
+                                <tr><td class="fw-semibold">Sexo</td><td>${p.sexo}</td></tr>
+                                <tr><td class="fw-semibold">Peso</td><td>${p.peso} kg</td></tr>
+                                <tr><td class="fw-semibold">Altura</td><td>${p.altura} m</td></tr>
+                                <tr><td class="fw-semibold">IMC</td><td>${p.IMC || '-'}</td></tr>
+                                <tr><td class="fw-semibold">Riesgo</td><td>${riesgoHtml}</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tr><td class="fw-semibold">Presión</td><td>${p.presion_sistolica}/${p.presion_diastolica}</td></tr>
+                                <tr><td class="fw-semibold">Frec. Cardíaca</td><td>${p.frecuencia_cardiaca}</td></tr>
+                                <tr><td class="fw-semibold">Glucosa</td><td>${p.glucosa}</td></tr>
+                                <tr><td class="fw-semibold">Colesterol</td><td>${p.colesterol}</td></tr>
+                                <tr><td class="fw-semibold">SpO2</td><td>${p.saturacion_oxigeno}%</td></tr>
+                                <tr><td class="fw-semibold">Temperatura</td><td>${p.temperatura}°C</td></tr>
+                                <tr><td class="fw-semibold">Diagnóstico</td><td>${p.diagnostico_preliminar || '-'}</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-12">
+                            <table class="table table-sm">
+                                <tr><td class="fw-semibold">Antecedentes</td><td>${p.antecedentes_familiares || 'Ninguno'}</td></tr>
+                                <tr><td class="fw-semibold">Fumador</td><td>${p.fumador}</td></tr>
+                                <tr><td class="fw-semibold">Alcohol</td><td>${p.consumo_alcohol}</td></tr>
+                                <tr><td class="fw-semibold">Actividad</td><td>${p.actividad_fisica}</td></tr>
+                                <tr><td class="fw-semibold">Fecha Consulta</td><td>${p.fecha_consulta}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                new bootstrap.Modal(document.getElementById('detailModal')).show();
+            } catch(e) {}
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('#pacientesBody tr').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('logoutBtn').onclick = async e => {
+            e.preventDefault();
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            await fetch('/api/auth/session-logout/', { method: 'POST', credentials: 'include' });
+            window.location.href = '/login/';
+        };
+
+        if (!getToken()) window.location.href = '/login/';
+        loadUserRole().then(() => loadPacientes());
+    </script>
+</body>
+</html>

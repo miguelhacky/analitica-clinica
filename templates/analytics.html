@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Analítica</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #0c4a6e, #1e40af); color: white; position: fixed; height: 100vh; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; margin: 0 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-analytics { background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stat-table th { background: #0c4a6e; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/etl/"><i class="bi bi-arrow-repeat"></i> ETL</a></div>
+        <div class="nav-item"><a href="/analytics/" class="active"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <h4 class="fw-bold mb-4"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Analítica de Datos</h4>
+
+        <div class="card-analytics mb-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-table"></i> Estadísticas Descriptivas</h6>
+            <div class="table-responsive">
+                <table class="table table-bordered stat-table" id="statsTable">
+                    <thead><tr><th>Variable</th><th>Media</th><th>Mediana</th><th>Moda</th><th>Desv. Estándar</th><th>Mín</th><th>Máx</th></tr></thead>
+                    <tbody id="statsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> Distribución por Edad</h6><canvas id="edadChartAnalytics"></canvas></div></div>
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-pie-chart"></i> Distribución por Riesgo</h6><canvas id="riesgoChartAnalytics"></canvas></div></div>
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> Distribución por IMC</h6><canvas id="imcChartAnalytics"></canvas></div></div>
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-graph-up"></i> Tendencias de Glucosa</h6><canvas id="glucosaChartAnalytics"></canvas></div></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        async function loadAnalytics() {
+            try {
+                const r = await fetch(`${API}/api/dashboard/kpis/`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                if (r.status === 401) { window.location.href = '/login/'; return; }
+                const data = await r.json();
+
+                const stats = data.estadisticas || {};
+                const tbody = document.getElementById('statsBody');
+                tbody.innerHTML = Object.entries(stats).map(([key, val]) => `
+                    <tr>
+                        <td class="fw-semibold">${key}</td>
+                        <td>${val.media}</td>
+                        <td>${val.mediana}</td>
+                        <td>${val.moda}</td>
+                        <td>${val.desviacion}</td>
+                        <td>${val.min}</td>
+                        <td>${val.max}</td>
+                    </tr>
+                `).join('');
+
+                const seg = data.segmentos || {};
+                const tend = data.tendencias || {};
+
+                if (seg.por_edad) {
+                    new Chart(document.getElementById('edadChartAnalytics'), {
+                        type: 'bar',
+                        data: { labels: Object.keys(seg.por_edad), datasets: [{ data: Object.values(seg.por_edad), backgroundColor: '#0ea5e9' }] },
+                        options: { plugins: { legend: { display: false } } }
+                    });
+                }
+                if (seg.por_riesgo) {
+                    const c = {'Bajo':'#10b981','Medio':'#f59e0b','Alto':'#f97316','Crítico':'#ef4444'};
+                    new Chart(document.getElementById('riesgoChartAnalytics'), {
+                        type: 'pie',
+                        data: { labels: Object.keys(seg.por_riesgo), datasets: [{ data: Object.values(seg.por_riesgo), backgroundColor: Object.keys(seg.por_riesgo).map(k=>c[k]||'#64748b') }] }
+                    });
+                }
+                if (seg.por_imc) {
+                    new Chart(document.getElementById('imcChartAnalytics'), {
+                        type: 'bar',
+                        data: { labels: Object.keys(seg.por_imc), datasets: [{ data: Object.values(seg.por_imc), backgroundColor: ['#10b981','#0ea5e9','#f59e0b','#f97316','#ef4444'] }] },
+                        options: { plugins: { legend: { display: false } } }
+                    });
+                }
+                if (tend.glucosa) {
+                    new Chart(document.getElementById('glucosaChartAnalytics'), {
+                        type: 'line',
+                        data: { labels: Object.keys(tend.glucosa), datasets: [{ data: Object.values(tend.glucosa), borderColor: '#0ea5e9', fill: true, backgroundColor: 'rgba(14,165,233,0.1)', tension: 0.4 }] },
+                        options: { plugins: { legend: { display: false } } }
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        document.getElementById('logoutBtn').onclick = e => { e.preventDefault(); localStorage.removeItem('access_token'); window.location.href = '/login/'; };
+
+        loadAnalytics();
+    </script>
+</body>
+</html>
