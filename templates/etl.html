@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - ETL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #0c4a6e, #1e40af); color: white; position: fixed; height: 100vh; padding:0; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item { padding: 0.5rem 1rem; }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-dashboard { background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .log-area { background: #0f172a; color: #e2e8f0; font-family: 'Cascadia Code', 'Consolas', monospace; padding: 1rem; border-radius: 0.5rem; max-height: 500px; overflow-y: auto; font-size: 0.8rem; line-height: 1.6; }
+        .log-extract { color: #60a5fa; }
+        .log-limpieza { color: #34d399; }
+        .log-conversion { color: #fbbf24; }
+        .log-nulos { color: #f97316; }
+        .log-calculo { color: #a78bfa; }
+        .log-clasificacion { color: #f472b6; }
+        .log-carga { color: #2dd4bf; }
+        .log-error { color: #ef4444; font-weight: bold; }
+        .log-separator { color: #64748b; text-align: center; border-bottom: 1px solid #334155; margin: 0.3rem 0; }
+        .log-resumen { color: #22c55e; font-weight: bold; }
+        .stat-box { text-align: center; padding: 1rem; background: #f8fafc; border-radius: 0.75rem; }
+        .stat-number { font-size: 1.8rem; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <h4 class="fw-bold mb-4"><i class="bi bi-arrow-repeat text-primary me-2"></i>Módulo ETL</h4>
+
+        <div class="row g-3 mb-4" id="statsRow" style="display:none">
+            <div class="col-md-3"><div class="stat-box"><div class="stat-number text-primary" id="statInicial">0</div><small class="text-muted">Registros iniciales</small></div></div>
+            <div class="col-md-3"><div class="stat-box"><div class="stat-number text-success" id="statFinal">0</div><small class="text-muted">Registros finales</small></div></div>
+            <div class="col-md-3"><div class="stat-box"><div class="stat-number text-warning" id="statLimpios">0</div><small class="text-muted">Limpiezas aplicadas</small></div></div>
+            <div class="col-md-3"><div class="stat-box"><div class="stat-number text-info" id="statTiempo">0s</div><small class="text-muted">Tiempo ejecución</small></div></div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card-dashboard">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-database text-primary"></i> Cargar Dataset Automático</h6>
+                    <p class="text-muted small">Genera y procesa automáticamente 1800 registros clínicos simulados con errores intencionales (nulos, duplicados, valores atípicos)</p>
+                    <button class="btn btn-primary" id="runAutoETL"><i class="bi bi-play-fill"></i> Ejecutar ETL Automático</button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card-dashboard">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-upload text-success"></i> Cargar Archivo Manual</h6>
+                    <p class="text-muted small">Sube tu propio archivo Excel o CSV con datos clínicos para procesar</p>
+                    <input type="file" class="form-control mb-2" id="fileInput" accept=".xlsx,.xls,.csv">
+                    <button class="btn btn-success" id="runFileETL"><i class="bi bi-upload"></i> Procesar Archivo</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-dashboard mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-journal-text text-primary"></i> Logs del Proceso</h6>
+                <button class="btn btn-sm btn-outline-secondary" id="clearLogsBtn"><i class="bi bi-trash"></i> Limpiar</button>
+            </div>
+            <div id="logArea" class="log-area">
+                <div class="text-muted" style="text-align:center;padding:2rem">⬤ Presione "Ejecutar ETL" para iniciar el proceso...</div>
+            </div>
+        </div>
+
+        <div class="card-dashboard">
+            <h6 class="fw-bold mb-3"><i class="bi bi-clock-history text-primary"></i> Historial ETL</h6>
+            <div class="table-responsive">
+                <table class="table table-hover table-sm" id="etlHistoryTable">
+                    <thead class="table-dark"><tr><th>Fecha</th><th>Archivo</th><th>Estado</th><th>Registros</th><th>Tiempo</th></tr></thead>
+                    <tbody id="etlHistoryBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        function log(msg, type='info') {
+            const area = document.getElementById('logArea');
+            const cls = {
+                'extract': 'log-extract', 'limpieza': 'log-limpieza', 'conversion': 'log-conversion',
+                'nulos': 'log-nulos', 'calculo': 'log-calculo', 'clasificacion': 'log-clasificacion',
+                'carga': 'log-carga', 'error': 'log-error', 'resumen': 'log-resumen'
+            };
+            const cssClass = cls[type] || '';
+            const prefix = type === 'error' ? '✖' : type === 'resumen' ? '✔' : '▸';
+            area.innerHTML += `<div class="${cssClass}">${prefix} ${msg}</div>`;
+            area.scrollTop = area.scrollHeight;
+            return msg;
+        }
+
+        function classifyLog(msg) {
+            const u = msg.toUpperCase();
+            if (u.startsWith('EXTRACT') || u.startsWith('ANTES')) return 'extract';
+            if (u.startsWith('LIMPIEZA') || u.startsWith('NULOS')) return u.startsWith('NULOS') ? 'nulos' : 'limpieza';
+            if (u.startsWith('CONVERSI') || u.startsWith('ERROR')) return u.startsWith('ERROR') ? 'error' : 'conversion';
+            if (u.startsWith('CÁLCULO') || u.startsWith('CALCULO')) return 'calculo';
+            if (u.startsWith('CLASIFIC') || u.startsWith('RESUMEN')) return u.startsWith('RESUMEN') ? 'resumen' : 'clasificacion';
+            if (u.startsWith('CARGA') || u.startsWith('LOAD')) return 'carga';
+            if (u.startsWith('---')) return 'resumen';
+            return 'info';
+        }
+
+        async function apiFetch(url, options = {}) {
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            const token = getToken();
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const r = await fetch(url, { ...options, headers, credentials: 'include' });
+            if (r.status === 401) { window.location.href = '/login/'; return null; }
+            return r;
+        }
+
+        document.getElementById('runAutoETL').onclick = async function() {
+            this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
+            document.getElementById('logArea').innerHTML = '';
+            document.getElementById('statsRow').style.display = 'none';
+
+            try {
+                const r = await apiFetch(`${API}/api/etl/run/`, {
+                    method: 'POST', body: JSON.stringify({ source: 'dataset' })
+                });
+                if (!r) return;
+                const data = await r.json();
+                if (data.success) {
+                    document.getElementById('statsRow').style.display = 'flex';
+                    document.getElementById('statInicial').textContent = data.registros_iniciales;
+                    document.getElementById('statFinal').textContent = data.registros_finales;
+                    document.getElementById('statLimpios').textContent = data.registros_iniciales - data.registros_finales;
+                    document.getElementById('statTiempo').textContent = data.tiempo_ejecucion + 's';
+                    log(`ETL COMPLETADO: ${data.registros_finales} registros cargados en ${data.tiempo_ejecucion}s`, 'resumen');
+                    if (data.logs) data.logs.forEach(l => log(l, classifyLog(l)));
+                } else {
+                    log(`ERROR: ${data.error}`, 'error');
+                    if (data.logs) data.logs.forEach(l => log(l, 'error'));
+                }
+                loadHistory();
+            } catch(e) { log(`Error: ${e.message}`, 'error'); }
+            this.disabled = false; this.innerHTML = '<i class="bi bi-play-fill"></i> Ejecutar ETL Automático';
+        };
+
+        document.getElementById('runFileETL').onclick = async function() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) { alert('Seleccione un archivo primero'); return; }
+            this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
+            document.getElementById('logArea').innerHTML = '';
+            document.getElementById('statsRow').style.display = 'none';
+            log(`Procesando archivo: ${file.name}...`, 'extract');
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('source', 'file');
+
+            try {
+                const r = await fetch(`${API}/api/etl/run/`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${getToken()}` },
+                    body: formData
+                });
+                const data = await r.json();
+                if (data.success) {
+                    document.getElementById('statsRow').style.display = 'flex';
+                    document.getElementById('statInicial').textContent = data.registros_iniciales;
+                    document.getElementById('statFinal').textContent = data.registros_finales;
+                    document.getElementById('statLimpios').textContent = data.registros_iniciales - data.registros_finales;
+                    document.getElementById('statTiempo').textContent = data.tiempo_ejecucion + 's';
+                    log('✔ ARCHIVO PROCESADO EXITOSAMENTE', 'resumen');
+                    if (data.logs) data.logs.forEach(l => log(l, classifyLog(l)));
+                } else {
+                    log(`✖ ERROR: ${data.error}`, 'error');
+                    if (data.logs) data.logs.forEach(l => log(l, 'error'));
+                }
+                loadHistory();
+            } catch(e) { log(`Error: ${e.message}`, 'error'); }
+            this.disabled = false; this.innerHTML = '<i class="bi bi-upload"></i> Procesar Archivo';
+        };
+
+        document.getElementById('clearLogsBtn').onclick = function() {
+            document.getElementById('logArea').innerHTML = '<div class="text-muted" style="text-align:center;padding:2rem">⬤ Logs limpiados</div>';
+            document.getElementById('statsRow').style.display = 'none';
+        };
+
+        async function loadHistory() {
+            try {
+                const r = await apiFetch(`${API}/api/dashboard/kpis/`);
+                if (!r) return;
+                const data = await r.json();
+                const body = document.getElementById('etlHistoryBody');
+                if (data.etl_historial && data.etl_historial.length) {
+                    body.innerHTML = data.etl_historial.map(h => `
+                        <tr>
+                            <td class="small">${h.fecha}</td>
+                            <td class="small">${h.archivo || 'dataset'}</td>
+                            <td><span class="badge ${h.estado === 'Completado' ? 'bg-success' : 'bg-danger'}">${h.estado}</span></td>
+                            <td>${h.registros}</td>
+                            <td>${h.tiempo}s</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    body.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">Sin historial ETL</td></tr>';
+                }
+            } catch(e) {}
+        }
+
+        document.getElementById('logoutBtn').onclick = async e => {
+            e.preventDefault();
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            await fetch('/api/auth/session-logout/', { method: 'POST', credentials: 'include' });
+            window.location.href = '/login/';
+        };
+
+        if (!getToken()) window.location.href = '/login/';
+        loadHistory();
+    </script>
+</body>
+</html>

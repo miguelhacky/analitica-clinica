@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Reportes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #0c4a6e, #1e40af); color: white; position: fixed; height: 100vh; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; margin: 0 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-reporte { background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; transition: all 0.3s; cursor: pointer; }
+        .card-reporte:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .card-reporte i { font-size: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/" class="active"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <h4 class="fw-bold mb-4"><i class="bi bi-file-earmark-text-fill text-primary me-2"></i>Exportación de Reportes</h4>
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card-reporte" onclick="exportReporte('excel')">
+                    <i class="bi bi-file-earmark-excel-fill text-success"></i>
+                    <h5 class="mt-3">Excel</h5>
+                    <p class="text-muted small">Reporte completo con múltiples hojas incluyendo KPIs y estadísticas</p>
+                    <button class="btn btn-success mt-2"><i class="bi bi-download"></i> Descargar Excel</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card-reporte" onclick="exportReporte('csv')">
+                    <i class="bi bi-file-earmark-spreadsheet-fill text-primary"></i>
+                    <h5 class="mt-3">CSV</h5>
+                    <p class="text-muted small">Datos de pacientes en formato CSV para análisis externo</p>
+                    <button class="btn btn-primary mt-2"><i class="bi bi-download"></i> Descargar CSV</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card-reporte" onclick="exportReporte('pdf')">
+                    <i class="bi bi-file-earmark-pdf-fill text-danger"></i>
+                    <h5 class="mt-3">PDF</h5>
+                    <p class="text-muted small">Reporte profesional en PDF con tabla de pacientes y KPIs</p>
+                    <button class="btn btn-danger mt-2"><i class="bi bi-download"></i> Descargar PDF</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-reporte mt-4 text-start">
+            <h6 class="fw-bold mb-3"><i class="bi bi-info-circle"></i> Información del Reporte</h6>
+            <p class="text-muted mb-0">Los reportes incluyen: datos completos de pacientes, KPIs clínicos (pacientes críticos, hipertensos, diabéticos, fumadores), estadísticas descriptivas (media, mediana, moda, desviación estándar) y segmentaciones por edad, sexo, IMC, diagnóstico y nivel de riesgo.</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        async function exportReporte(tipo) {
+            try {
+                const r = await fetch(`${API}/api/reportes/?tipo=${tipo}&reporte=pacientes`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                if (r.status === 401) { window.location.href = '/login/'; return; }
+                const blob = await r.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const ext = { 'excel': 'xlsx', 'csv': 'csv', 'pdf': 'pdf' };
+                a.download = `reporte_healthanalytics.${ext[tipo] || tipo}`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } catch(e) {
+                alert('Error al descargar reporte');
+            }
+        }
+
+        document.getElementById('logoutBtn').onclick = e => { e.preventDefault(); localStorage.removeItem('access_token'); window.location.href = '/login/'; };
+    </script>
+</body>
+</html>
