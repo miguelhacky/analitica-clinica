@@ -8,6 +8,9 @@ media/profiles/
 .DS_Store
 Thumbs.db
 .env
+.env.prod
+.env.vercel
+.env.local
 .vercel
 
 .vercel
