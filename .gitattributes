@@ -3,3 +3,4 @@
 *.jpeg binary
 *.jpg binary
 *.ico binary
+data_fixture.json binary
