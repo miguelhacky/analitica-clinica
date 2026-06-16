@@ -14,23 +14,25 @@ from django.contrib.auth.decorators import login_required
 import json
 
 
-def send_email_brevo(subject, html_content, to_email):
+def send_email_brevo(subject, html_content, to_email, raise_on_error=False):
     import logging
     logger = logging.getLogger(__name__)
+    if not settings.BREVO_API_KEY:
+        logger.info(f"Email to {to_email}: {subject}")
+        return
+    config = sib_api_v3_sdk.Configuration()
+    config.api_key['api-key'] = settings.BREVO_API_KEY
+    api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(config))
+    sender = {'email': settings.BREVO_SMTP_USER, 'name': 'HealthAnalytics IPS'}
+    to = [{'email': to_email}]
     try:
-        if not settings.BREVO_API_KEY:
-            logger.info(f"Email to {to_email}: {subject}")
-            return
-        config = sib_api_v3_sdk.Configuration()
-        config.api_key['api-key'] = settings.BREVO_API_KEY
-        api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(config))
-        sender = {'email': settings.BREVO_SMTP_USER, 'name': 'HealthAnalytics IPS'}
-        to = [{'email': to_email}]
         api.send_transac_email(
             sib_api_v3_sdk.SendSmtpEmail(sender=sender, to=to, subject=subject, html_content=html_content)
         )
     except Exception as e:
         logger.error(f"Error sending email: {e}")
+        if raise_on_error:
+            raise
 
 
 @csrf_exempt
@@ -193,13 +195,15 @@ def password_reset_send_code(request):
             PasswordResetCode.objects.filter(user=user, used=False).delete()
             code = ''.join(random.choices(string.digits, k=6))
             PasswordResetCode.objects.create(user=user, code=code)
-            import threading
-            t = threading.Thread(target=send_email_brevo, args=(
-                'Código de recuperación - HealthAnalytics IPS',
-                f'<h2>Recuperación de contraseña</h2><p>Tu código de recuperación es:</p><h1 style="color:#0c4a6e;letter-spacing:5px">{code}</h1><p>Este código expira al usarlo.</p>',
-                email,
-            ))
-            t.start()
+            try:
+                send_email_brevo(
+                    'Código de recuperación - HealthAnalytics IPS',
+                    f'<h2>Recuperación de contraseña</h2><p>Tu código de recuperación es:</p><h1 style="color:#0c4a6e;letter-spacing:5px">{code}</h1><p>Este código expira al usarlo.</p>',
+                    email,
+                    raise_on_error=True,
+                )
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f'Error al enviar correo: {str(e)}'}, status=500)
             return JsonResponse({'success': True, 'message': 'Código enviado a tu correo'})
         except User.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'No existe una cuenta con ese correo'}, status=404)
