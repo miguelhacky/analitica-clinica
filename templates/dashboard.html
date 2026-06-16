@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Dashboard</title>
+    <link rel="icon" href="/static/Icono.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root { --primary: #0c4a6e; --secondary: #0ea5e9; --accent: #06b6d4; --dark: #1e293b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: url('/static/Inicio.jpeg') no-repeat center center / cover; color: white; padding: 0; position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto; z-index: 1000; transition: all 0.3s; }
+        .sidebar-header { padding: 1.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+        .sidebar-header i { font-size: 2.5rem; }
+        .sidebar-header h5 { margin-top: 0.5rem; font-weight: 700; }
+        .sidebar-header small { opacity: 0.7; }
+        .nav-item { padding: 0.5rem 1rem; }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .nav-item a i { font-size: 1.2rem; width: 24px; text-align: center; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .topbar { background: white; border-radius: 1rem; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .kpi-card { background: white; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.3s; }
+        .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .kpi-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+        .kpi-value { font-size: 1.8rem; font-weight: 700; }
+        .kpi-label { font-size: 0.85rem; color: #64748b; }
+        .chart-container { background: white; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .logout-btn { color: #ef4444 !important; }
+        .logout-btn:hover { background: rgba(239,68,68,0.15) !important; }
+        @media (max-width: 768px) { .sidebar { width: 60px; } .sidebar span, .sidebar small, .sidebar h5 { display: none; } .main-content { margin-left: 60px; } }
+        .loading { display: flex; align-items: center; justify-content: center; padding: 3rem; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #0c4a6e; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="bi bi-heart-pulse-fill"></i>
+            <h5>HealthAnalytics</h5>
+            <small>IPS</small>
+        </div>
+        <div class="mt-2">
+            <div class="nav-item"><a href="/dashboard/" class="active"><i class="bi bi-grid-fill"></i> <span>Dashboard</span></a></div>
+            <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> <span>Pacientes</span></a></div>
+            <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> <span>Analítica</span></a></div>
+            <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> <span>Predicciones</span></a></div>
+            <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> <span>Reportes</span></a></div>
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 1rem;">
+            <div class="nav-item"><a href="#" id="logoutBtn" class="logout-btn"><i class="bi bi-box-arrow-right"></i> <span>Cerrar Sesión</span></a></div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="topbar">
+            <div>
+                <h5 class="mb-0 fw-bold"><i class="bi bi-grid-fill text-primary me-2"></i>Dashboard Clínico</h5>
+                <small class="text-muted">Panel principal de indicadores y analítica</small>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <a href="#" data-bs-toggle="modal" data-bs-target="#profileModal" class="text-decoration-none d-flex align-items-center gap-2">
+                    {% if user_profile_pic %}
+                        <img src="{{ user_profile_pic }}" class="rounded-circle" style="width:36px;height:36px;object-fit:cover">
+                    {% else %}
+                        <i class="bi bi-person-circle fs-4 text-primary"></i>
+                    {% endif %}
+                    <div class="text-end">
+                        <div class="fw-semibold small">{{ user_name }}</div>
+                        <small class="text-muted">{{ user_role }}</small>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div id="loading" class="loading"><div class="spinner"></div></div>
+        <div id="dashboardContent" style="display:none">
+
+            <div class="row g-3 mb-4" id="kpiRow"></div>
+            <div class="row g-3 mb-4" id="estadoRow"></div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-8"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-graph-up text-primary me-2"></i>Distribución por Diagnóstico</h6><canvas id="diagnosticoChart"></canvas></div></div>
+                <div class="col-md-4"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-pie-chart text-primary me-2"></i>Riesgos</h6><canvas id="riesgoChart"></canvas></div></div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-bar-chart text-primary me-2"></i>Tendencias de Glucosa</h6><canvas id="tendenciaChart"></canvas></div></div>
+                <div class="col-md-6"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-heatmap text-primary me-2"></i>Distribución por Edad</h6><canvas id="edadChart"></canvas></div></div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Sexo</h6><canvas id="sexoChart"></canvas></div></div>
+                <div class="col-md-6"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-fill text-primary me-2"></i>IMC</h6><canvas id="imcChart"></canvas></div></div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-12"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-activity text-primary me-2"></i>Tendencias de Presión Arterial y Colesterol</h6><canvas id="tendenciaMultipleChart"></canvas></div></div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6"><div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-virus text-primary me-2"></i>Enfermedades Contagiosas</h6><canvas id="contagiosasChart"></canvas></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Edit Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-gear me-2"></i>Editar Perfil</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="profileForm" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div id="profileError" class="alert alert-danger d-none"></div>
+                        <div id="profileSuccess" class="alert alert-success d-none"></div>
+                        <div class="text-center mb-3">
+                            <label for="profilePictureInput" style="cursor:pointer">
+                                <div class="position-relative d-inline-block">
+                                    <img id="profilePreview" src="" class="rounded-circle" style="width:100px;height:100px;object-fit:cover;border:3px solid #0c4a6e">
+                                    <div class="position-absolute bottom-0 end-0 bg-primary rounded-circle p-2">
+                                        <i class="bi bi-camera-fill text-white small"></i>
+                                    </div>
+                                </div>
+                            </label>
+                            <input type="file" id="profilePictureInput" name="profile_picture" accept="image/*" class="d-none">
+                            <div class="small text-muted mt-1">Haz clic para cambiar foto</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="profileFirstName" name="first_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="profileLastName" name="last_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo</label>
+                                <input type="email" class="form-control" id="profileEmail" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rol</label>
+                                <input type="text" class="form-control" id="profileRole" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de nacimiento</label>
+                                <input type="date" class="form-control" id="profileDob" name="date_of_birth">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="profileSaveBtn">
+                            <i class="bi bi-check-lg"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = window.location.origin;
+
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        async function apiFetch(url, options = {}) {
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            const token = getToken();
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const response = await fetch(url, { ...options, headers, credentials: 'include' });
+            if (response.status === 401) {
+                const refreshResp = await fetch('/api/auth/token/refresh/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh: localStorage.getItem('refresh_token') })
+                });
+                if (refreshResp.ok) {
+                    const data = await refreshResp.json();
+                    localStorage.setItem('access_token', data.access);
+                    headers['Authorization'] = `Bearer ${data.access}`;
+                    const retry = await fetch(url, { ...options, headers, credentials: 'include' });
+                    return retry;
+                }
+                window.location.href = '/login/';
+                return null;
+            }
+            return response;
+        }
+
+        const colors = ['#0c4a6e','#0ea5e9','#06b6d4','#14b8a6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#6366f1'];
+
+        function getColor(index) { return colors[index % colors.length]; }
+
+        let dashboardDataLoaded = false;
+
+        async function loadDashboard() {
+            const loading = document.getElementById('loading');
+            const content = document.getElementById('dashboardContent');
+
+            try {
+                const response = await apiFetch(`${API_BASE}/api/dashboard/kpis/`);
+                if (!response) return;
+                const data = await response.json();
+                if (!dashboardDataLoaded) {
+                    loading.style.display = 'none';
+                    content.style.display = 'block';
+                    dashboardDataLoaded = true;
+                }
+                renderKPIs(data.kpis);
+                renderEstado(data.kpis);
+                renderCharts(data);
+            } catch (err) {
+                if (!dashboardDataLoaded) {
+                    loading.innerHTML = '<div class="alert alert-danger">Error cargando datos del dashboard</div>';
+                }
+            }
+        }
+
+        function renderKPIs(kpis) {
+            const row = document.getElementById('kpiRow');
+            const items = [
+                { icon: 'bi-people-fill', bg: '#0c4a6e', label: 'Total Pacientes', value: kpis.total_pacientes },
+                { icon: 'bi-exclamation-triangle-fill', bg: '#ef4444', label: 'Críticos', value: kpis.pacientes_criticos + ` (${kpis.porcentaje_criticos}%)` },
+                { icon: 'bi-heart-pulse-fill', bg: '#f59e0b', label: 'Hipertensos', value: kpis.pacientes_hipertensos + ` (${kpis.porcentaje_hipertensos}%)` },
+                { icon: 'bi-droplet-fill', bg: '#8b5cf6', label: 'Diabéticos', value: kpis.pacientes_diabeticos + ` (${kpis.porcentaje_diabeticos}%)` },
+                { icon: 'bi-fire', bg: '#06b6d4', label: 'Fumadores', value: kpis.pacientes_fumadores + ` (${kpis.porcentaje_fumadores}%)` },
+                { icon: 'bi-shield-fill-check', bg: '#10b981', label: 'Riesgo Promedio', value: kpis.riesgo_promedio },
+                { icon: 'bi-virus', bg: '#dc2626', label: 'Contagiosos', value: kpis.pacientes_contagiosos + ` (${kpis.porcentaje_contagiosos}%)` },
+            ];
+            row.innerHTML = items.map((item, i) => `
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card text-center">
+                        <div class="kpi-icon mx-auto mb-2" style="background:${item.bg}20;color:${item.bg}"><i class="bi ${item.icon}"></i></div>
+                        <div class="kpi-value" style="color:${item.bg}">${item.value}</div>
+                        <div class="kpi-label">${item.label}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderEstado(kpis) {
+            const row = document.getElementById('estadoRow');
+            const items = [
+                { icon: 'bi-person-check-fill', bg: '#10b981', label: 'Activos', value: kpis.pacientes_activos + ` (${kpis.porcentaje_activos}%)` },
+                { icon: 'bi-hospital-fill', bg: '#f59e0b', label: 'Hospitalizados', value: kpis.pacientes_hospitalizados + ` (${kpis.porcentaje_hospitalizados}%)` },
+                { icon: 'bi-house-check-fill', bg: '#0ea5e9', label: 'Dados de Alta', value: kpis.pacientes_dados_alta + ` (${kpis.porcentaje_dados_alta}%)` },
+                { icon: 'bi-heartbreak-fill', bg: '#64748b', label: 'Fallecidos', value: kpis.pacientes_fallecidos + ` (${kpis.porcentaje_fallecidos}%)` },
+                { icon: 'bi-virus', bg: '#dc2626', label: 'Críticos Contagiosos', value: kpis.criticos_contagiosos },
+            ];
+            row.innerHTML = items.map((item, i) => `
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card text-center">
+                        <div class="kpi-icon mx-auto mb-2" style="background:${item.bg}20;color:${item.bg}"><i class="bi ${item.icon}"></i></div>
+                        <div class="kpi-value" style="color:${item.bg}">${item.value}</div>
+                        <div class="kpi-label">${item.label}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        let charts = {};
+
+        function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+        function renderCharts(data) {
+            const seg = data.segmentos || {};
+            const tend = data.tendencias || {};
+
+            if (seg.por_diagnostico) {
+                destroyChart('diagnostico');
+                const labels = Object.keys(seg.por_diagnostico).filter(k => k !== 'nan').slice(0, 10);
+                const values = labels.map(k => seg.por_diagnostico[k]);
+                charts.diagnostico = new Chart(document.getElementById('diagnosticoChart'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Pacientes', data: values, backgroundColor: labels.map((_, i) => getColor(i)) }] },
+                    options: { responsive: true, plugins: { legend: { display: false } } }
+                });
+            }
+
+            if (seg.por_riesgo) {
+                destroyChart('riesgo');
+                const labels = Object.keys(seg.por_riesgo);
+                const values = labels.map(k => seg.por_riesgo[k]);
+                const riesgoColors = { 'Bajo': '#10b981', 'Medio': '#f59e0b', 'Alto': '#f97316', 'Crítico': '#ef4444' };
+                charts.riesgo = new Chart(document.getElementById('riesgoChart'), {
+                    type: 'pie',
+                    data: { labels, datasets: [{ data: values, backgroundColor: labels.map(k => riesgoColors[k] || '#64748b') }] },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+
+            if (tend.glucosa) {
+                destroyChart('tendencia');
+                const labels = Object.keys(tend.glucosa);
+                const values = labels.map(k => tend.glucosa[k]);
+                charts.tendencia = new Chart(document.getElementById('tendenciaChart'), {
+                    type: 'line',
+                    data: { labels, datasets: [{ label: 'Glucosa', data: values, borderColor: '#0ea5e9', fill: true, backgroundColor: 'rgba(14,165,233,0.1)', tension: 0.4 }] },
+                    options: { responsive: true, plugins: { legend: { display: false } } }
+                });
+            }
+
+            if (seg.por_edad) {
+                destroyChart('edad');
+                const labels = Object.keys(seg.por_edad);
+                const values = labels.map(k => seg.por_edad[k]);
+                charts.edad = new Chart(document.getElementById('edadChart'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Pacientes', data: values, backgroundColor: '#0ea5e9' }] },
+                    options: { responsive: true, plugins: { legend: { display: false } } }
+                });
+            }
+
+            if (seg.por_sexo) {
+                destroyChart('sexo');
+                const labels = Object.keys(seg.por_sexo);
+                const values = labels.map(k => seg.por_sexo[k]);
+                charts.sexo = new Chart(document.getElementById('sexoChart'), {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data: values, backgroundColor: ['#0ea5e9', '#ec4899'] }] },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+
+            if (seg.por_imc) {
+                destroyChart('imc');
+                const labels = Object.keys(seg.por_imc);
+                const values = labels.map(k => seg.por_imc[k]);
+                charts.imc = new Chart(document.getElementById('imcChart'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Pacientes', data: values, backgroundColor: ['#10b981','#0ea5e9','#f59e0b','#f97316','#ef4444'] }] },
+                    options: { responsive: true, plugins: { legend: { display: false } } }
+                });
+            }
+
+            if (data.kpis && data.kpis.enfermedades_contagiosas_stats) {
+                destroyChart('contagiosas');
+                const stats = data.kpis.enfermedades_contagiosas_stats;
+                const labels = Object.keys(stats);
+                const values = labels.map(k => stats[k].total);
+                charts.contagiosas = new Chart(document.getElementById('contagiosasChart'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Pacientes', data: values, backgroundColor: labels.map((_, i) => getColor(i)) }] },
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                });
+            }
+
+            if (tend.presion_sistolica && tend.colesterol) {
+                destroyChart('tendenciaMultiple');
+                const labels = Object.keys(tend.presion_sistolica);
+                const presion = labels.map(k => tend.presion_sistolica[k]);
+                const colesterol_data = labels.map(k => tend.colesterol[k]);
+                charts.tendenciaMultiple = new Chart(document.getElementById('tendenciaMultipleChart'), {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Presión Sistólica', data: presion, borderColor: '#ef4444', tension: 0.4 },
+                            { label: 'Colesterol', data: colesterol_data, borderColor: '#f59e0b', tension: 0.4 }
+                        ]
+                    },
+                    options: { responsive: true }
+                });
+            }
+        }
+
+        // Profile modal - load data when opened
+        document.getElementById('profileModal').addEventListener('show.bs.modal', async function() {
+            const r = await fetch('/api/auth/csrf/');
+            const d = await r.json();
+            const res = await fetch('/api/auth/profile/', {
+                headers: { 'X-CSRFToken': d.csrfToken }
+            });
+            const data = await res.json();
+            if (data.email) {
+                document.getElementById('profileFirstName').value = data.first_name || '';
+                document.getElementById('profileLastName').value = data.last_name || '';
+                document.getElementById('profileEmail').value = data.email;
+                document.getElementById('profileRole').value = data.role;
+                document.getElementById('profileDob').value = data.date_of_birth || '';
+                const preview = document.getElementById('profilePreview');
+                if (data.profile_picture) {
+                    preview.src = data.profile_picture;
+                } else {
+                    preview.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(data.first_name || data.email) + '&background=0c4a6e&color=fff&size=100';
+                }
+            }
+        });
+
+        // Profile picture preview on file select
+        document.getElementById('profilePictureInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profilePreview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Profile form submit
+        document.getElementById('profileForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('profileSaveBtn');
+            const errorEl = document.getElementById('profileError');
+            const successEl = document.getElementById('profileSuccess');
+            errorEl.classList.add('d-none');
+            successEl.classList.add('d-none');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+
+            try {
+                const r = await fetch('/api/auth/csrf/');
+                const d = await r.json();
+                const formData = new FormData(this);
+                const res = await fetch('/api/auth/profile/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': d.csrfToken },
+                    body: formData
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    successEl.textContent = result.message;
+                    successEl.classList.remove('d-none');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    errorEl.textContent = result.error || 'Error al guardar';
+                    errorEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                errorEl.textContent = 'Error de conexión';
+                errorEl.classList.remove('d-none');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Guardar Cambios';
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            await fetch('/api/auth/session-logout/', { method: 'POST', credentials: 'include' });
+            window.location.href = '/login/';
+        });
+
+        loadDashboard();
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>

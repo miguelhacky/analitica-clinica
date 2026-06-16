@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite3
+media/profiles/
+*.joblib
+.DS_Store
+Thumbs.db

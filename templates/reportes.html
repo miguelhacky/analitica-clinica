@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Reportes</title>
+    <link rel="icon" href="/static/Icono.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; }
+        .sidebar { width: 260px; background: url('/static/Inicio.jpeg') no-repeat center center / cover; color: white; position: fixed; height: 100vh; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; margin: 0 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-reporte { background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; transition: all 0.3s; cursor: pointer; }
+        .card-reporte:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .card-reporte i { font-size: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/" class="active"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold mb-0"><i class="bi bi-file-earmark-text-fill text-primary me-2"></i>Exportación de Reportes</h4>
+            <div class="d-flex align-items-center gap-3">
+                <a href="#" data-bs-toggle="modal" data-bs-target="#profileModal" class="text-decoration-none d-flex align-items-center gap-2">
+                    {% if user_profile_pic %}
+                        <img src="{{ user_profile_pic }}" class="rounded-circle" style="width:36px;height:36px;object-fit:cover">
+                    {% else %}
+                        <i class="bi bi-person-circle fs-4 text-primary"></i>
+                    {% endif %}
+                    <div class="text-end">
+                        <div class="fw-semibold small">{{ user_name }}</div>
+                        <small class="text-muted">{{ user_role }}</small>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card-reporte" onclick="exportReporte('excel')">
+                    <i class="bi bi-file-earmark-excel-fill text-success"></i>
+                    <h5 class="mt-3">Excel</h5>
+                    <p class="text-muted small">Reporte completo con múltiples hojas incluyendo KPIs y estadísticas</p>
+                    <button class="btn btn-success mt-2"><i class="bi bi-download"></i> Descargar Excel</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card-reporte" onclick="exportReporte('csv')">
+                    <i class="bi bi-file-earmark-spreadsheet-fill text-primary"></i>
+                    <h5 class="mt-3">CSV</h5>
+                    <p class="text-muted small">Datos de pacientes en formato CSV para análisis externo</p>
+                    <button class="btn btn-primary mt-2"><i class="bi bi-download"></i> Descargar CSV</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card-reporte" onclick="exportReporte('pdf')">
+                    <i class="bi bi-file-earmark-pdf-fill text-danger"></i>
+                    <h5 class="mt-3">PDF</h5>
+                    <p class="text-muted small">Reporte profesional en PDF con tabla de pacientes y KPIs</p>
+                    <button class="btn btn-danger mt-2"><i class="bi bi-download"></i> Descargar PDF</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-reporte mt-4 text-start">
+            <h6 class="fw-bold mb-3"><i class="bi bi-info-circle"></i> Información del Reporte</h6>
+            <p class="text-muted mb-0">Los reportes incluyen: datos completos de pacientes, KPIs clínicos (pacientes críticos, hipertensos, diabéticos, fumadores), estadísticas descriptivas (media, mediana, moda, desviación estándar) y segmentaciones por edad, sexo, IMC, diagnóstico y nivel de riesgo.</p>
+        </div>
+    </div>
+
+    <!-- Profile Edit Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-gear me-2"></i>Editar Perfil</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="profileForm" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div id="profileError" class="alert alert-danger d-none"></div>
+                        <div id="profileSuccess" class="alert alert-success d-none"></div>
+                        <div class="text-center mb-3">
+                            <label for="profilePictureInput" style="cursor:pointer">
+                                <div class="position-relative d-inline-block">
+                                    <img id="profilePreview" src="" class="rounded-circle" style="width:100px;height:100px;object-fit:cover;border:3px solid #0c4a6e">
+                                    <div class="position-absolute bottom-0 end-0 bg-primary rounded-circle p-2">
+                                        <i class="bi bi-camera-fill text-white small"></i>
+                                    </div>
+                                </div>
+                            </label>
+                            <input type="file" id="profilePictureInput" name="profile_picture" accept="image/*" class="d-none">
+                            <div class="small text-muted mt-1">Haz clic para cambiar foto</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="profileFirstName" name="first_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="profileLastName" name="last_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo</label>
+                                <input type="email" class="form-control" id="profileEmail" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rol</label>
+                                <input type="text" class="form-control" id="profileRole" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de nacimiento</label>
+                                <input type="date" class="form-control" id="profileDob" name="date_of_birth">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="profileSaveBtn">
+                            <i class="bi bi-check-lg"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        async function exportReporte(tipo) {
+            try {
+                const headers = { 'Authorization': `Bearer ${getToken()}` };
+                if (!getToken()) delete headers['Authorization'];
+                const r = await fetch(`${API}/api/reportes/?tipo=${tipo}&reporte=pacientes`, {
+                    headers, credentials: 'include'
+                });
+                if (r.status === 401) { window.location.href = '/login/'; return; }
+                const blob = await r.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const ext = { 'excel': 'xlsx', 'csv': 'csv', 'pdf': 'pdf' };
+                a.download = `reporte_healthanalytics.${ext[tipo] || tipo}`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } catch(e) {
+                alert('Error al descargar reporte');
+            }
+        }
+
+        // Profile modal - load data when opened
+        document.getElementById('profileModal').addEventListener('show.bs.modal', async function() {
+            const r = await fetch('/api/auth/csrf/');
+            const d = await r.json();
+            const res = await fetch('/api/auth/profile/', {
+                headers: { 'X-CSRFToken': d.csrfToken }
+            });
+            const data = await res.json();
+            if (data.email) {
+                document.getElementById('profileFirstName').value = data.first_name || '';
+                document.getElementById('profileLastName').value = data.last_name || '';
+                document.getElementById('profileEmail').value = data.email;
+                document.getElementById('profileRole').value = data.role;
+                document.getElementById('profileDob').value = data.date_of_birth || '';
+                const preview = document.getElementById('profilePreview');
+                if (data.profile_picture) {
+                    preview.src = data.profile_picture;
+                } else {
+                    preview.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(data.first_name || data.email) + '&background=0c4a6e&color=fff&size=100';
+                }
+            }
+        });
+
+        // Profile picture preview on file select
+        document.getElementById('profilePictureInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profilePreview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Profile form submit
+        document.getElementById('profileForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('profileSaveBtn');
+            const errorEl = document.getElementById('profileError');
+            const successEl = document.getElementById('profileSuccess');
+            errorEl.classList.add('d-none');
+            successEl.classList.add('d-none');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+
+            try {
+                const r = await fetch('/api/auth/csrf/');
+                const d = await r.json();
+                const formData = new FormData(this);
+                const res = await fetch('/api/auth/profile/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': d.csrfToken },
+                    body: formData
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    successEl.textContent = result.message;
+                    successEl.classList.remove('d-none');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    errorEl.textContent = result.error || 'Error al guardar';
+                    errorEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                errorEl.textContent = 'Error de conexión';
+                errorEl.classList.remove('d-none');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Guardar Cambios';
+        });
+
+        document.getElementById('logoutBtn').onclick = e => { e.preventDefault(); localStorage.removeItem('access_token'); window.location.href = '/login/'; };
+    </script>
+</body>
+</html>

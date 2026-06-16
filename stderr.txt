@@ -1,0 +1,17 @@
+Watching for file changes with StatReloader
+[09/Jun/2026 07:35:46] "GET / HTTP/1.1" 200 6166
+[09/Jun/2026 07:35:46,304] - Broken pipe from ('127.0.0.1', 57775)
+[09/Jun/2026 07:35:49] "GET / HTTP/1.1" 200 6166
+Not Found: /favicon.ico
+[09/Jun/2026 07:35:50] "GET /favicon.ico HTTP/1.1" 404 6567
+[09/Jun/2026 07:37:26] "GET / HTTP/1.1" 200 6192
+Not Found: /password-reset/
+[09/Jun/2026 07:37:31] "GET /password-reset/ HTTP/1.1" 404 6579
+C:\Users\Aprendiz\Desktop\Proyec-20260609T120921Z-3-001\Proyec\accounts\models.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Aprendiz\Desktop\Proyec-20260609T120921Z-3-001\Proyec\health_analytics\settings.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Aprendiz\Desktop\Proyec-20260609T120921Z-3-001\Proyec\dashboard\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Aprendiz\Desktop\Proyec-20260609T120921Z-3-001\Proyec\dashboard\views.py changed, reloading.
+Watching for file changes with StatReloader

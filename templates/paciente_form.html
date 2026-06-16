@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - {{ paciente_id|yesno:"Editar,Nuevo" }} Paciente</title>
+    <link rel="icon" href="/static/Icono.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; }
+        .sidebar { width: 260px; background: url('/static/Inicio.jpeg') no-repeat center center / cover; color: white; position: fixed; height: 100vh; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; margin: 0 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-form { background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .form-label { font-weight: 600; font-size: 0.9rem; color: #334155; }
+        .form-control, .form-select { border-radius: 0.5rem; padding: 0.6rem 0.75rem; }
+        .form-control:focus, .form-select:focus { border-color: #0ea5e9; box-shadow: 0 0 0 0.2rem rgba(14,165,233,0.25); }
+        .btn-guardar { background: linear-gradient(135deg, #0c4a6e, #1e40af); border: none; padding: 0.6rem 2rem; font-weight: 600; }
+        .btn-guardar:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(12,74,110,0.4); }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/" class="active"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-0"><i class="bi bi-person-plus-fill text-primary me-2"></i>{{ paciente_id|yesno:"Editar Paciente,Nuevo Paciente" }}</h4>
+                <small class="text-muted">Complete todos los campos del paciente</small>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <a href="/pacientes/" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+                <a href="#" data-bs-toggle="modal" data-bs-target="#profileModal" class="text-decoration-none d-flex align-items-center gap-2">
+                    {% if user_profile_pic %}
+                        <img src="{{ user_profile_pic }}" class="rounded-circle" style="width:36px;height:36px;object-fit:cover">
+                    {% else %}
+                        <i class="bi bi-person-circle fs-4 text-primary"></i>
+                    {% endif %}
+                    <div class="text-end">
+                        <div class="fw-semibold small">{{ user_name }}</div>
+                        <small class="text-muted">{{ user_role }}</small>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="card-form">
+            <form id="pacienteForm">
+                <input type="hidden" id="pacienteId" value="{{ paciente_id|default:'' }}">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">ID Paciente</label>
+                        <input type="text" class="form-control" id="id_paciente" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Nombres</label>
+                        <input type="text" class="form-control" id="nombres" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Apellidos</label>
+                        <input type="text" class="form-control" id="apellidos" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Edad</label>
+                        <input type="number" class="form-control" id="edad" min="0" max="120" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Sexo</label>
+                        <select class="form-select" id="sexo">
+                            <option value="Masculino">Masculino</option>
+                            <option value="Femenino">Femenino</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Peso (kg)</label>
+                        <input type="number" step="0.1" class="form-control" id="peso" required oninput="calcIMC()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Altura (m)</label>
+                        <input type="number" step="0.01" class="form-control" id="altura" required oninput="calcIMC()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">IMC <small class="text-muted">(automático)</small></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="imc_display" readonly style="background:#f1f5f9;font-weight:700">
+                            <span class="input-group-text" id="imcBadge" style="min-width:110px;font-weight:600;font-size:0.8rem">Esperando datos...</span>
+                        </div>
+                        <input type="hidden" id="IMC">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Presión Sistólica</label>
+                        <input type="number" class="form-control" id="presion_sistolica" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Presión Diastólica</label>
+                        <input type="number" class="form-control" id="presion_diastolica" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Frecuencia Cardíaca</label>
+                        <input type="number" class="form-control" id="frecuencia_cardiaca" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Glucosa</label>
+                        <input type="number" step="0.1" class="form-control" id="glucosa" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Colesterol</label>
+                        <input type="number" step="0.1" class="form-control" id="colesterol" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Saturación Oxígeno</label>
+                        <input type="number" step="0.1" class="form-control" id="saturacion_oxigeno" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Temperatura</label>
+                        <input type="number" step="0.1" class="form-control" id="temperatura" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Antecedentes Familiares</label>
+                        <select class="form-select" id="antecedentes_familiares">
+                            <option value="Ninguno">Ninguno</option>
+                            <option value="Diabetes">Diabetes</option>
+                            <option value="Hipertensión">Hipertensión</option>
+                            <option value="Cáncer">Cáncer</option>
+                            <option value="Cardiopatía">Cardiopatía</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Fumador</label>
+                        <select class="form-select" id="fumador">
+                            <option value="No">No</option>
+                            <option value="Sí">Sí</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Consumo Alcohol</label>
+                        <select class="form-select" id="consumo_alcohol">
+                            <option value="No">No</option>
+                            <option value="Sí">Sí</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Actividad Física</label>
+                        <select class="form-select" id="actividad_fisica">
+                            <option value="Sedentario">Sedentario</option>
+                            <option value="Moderado">Moderado</option>
+                            <option value="Activo">Activo</option>
+                            <option value="Intenso">Intenso</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Diagnóstico Preliminar</label>
+                        <input type="text" class="form-control" id="diagnostico_preliminar">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Riesgo Enfermedad <span class="text-danger">*</span></label>
+                        <select class="form-select" id="riesgo_enfermedad" required>
+                            <option value="Bajo">Bajo</option>
+                            <option value="Medio">Medio</option>
+                            <option value="Alto">Alto</option>
+                            <option value="Crítico">Crítico</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Estado</label>
+                        <select class="form-select" id="estado" onchange="toggleEstadoFields()">
+                            <option value="Activo">Activo</option>
+                            <option value="Hospitalizado">Hospitalizado</option>
+                            <option value="Dado de Alta">Dado de Alta</option>
+                            <option value="Fallecido">Fallecido</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4" id="fechaAltaGroup" style="display:none">
+                        <label class="form-label">Fecha de Alta</label>
+                        <input type="date" class="form-control" id="fecha_alta">
+                    </div>
+                    <div class="col-md-4" id="fechaFallecimientoGroup" style="display:none">
+                        <label class="form-label">Fecha de Fallecimiento</label>
+                        <input type="date" class="form-control" id="fecha_fallecimiento">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Ubicación</label>
+                        <select class="form-select" id="ubicacion" onchange="togglePiso()">
+                            <option value="Consulta Externa">Consulta Externa</option>
+                            <option value="Urgencias">Urgencias</option>
+                            <option value="Hospitalización">Hospitalización</option>
+                            <option value="UCI">UCI</option>
+                            <option value="Cirugía">Cirugía</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Piso</label>
+                        <input type="number" class="form-control" id="piso" min="1" max="20" placeholder="Nº piso">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Fecha Consulta</label>
+                        <input type="date" class="form-control" id="fecha_consulta" required>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <label class="form-label"><i class="bi bi-heart-pulse text-danger me-1"></i>Necesidades de Cuidado</label>
+                        <div class="input-group mb-1">
+                            <textarea class="form-control" id="necesidades_cuidado" rows="2" placeholder="Ej: Oxígeno, Cambio de suero, Medicación, Monitoreo..."></textarea>
+                        </div>
+                        <small class="text-muted" id="suggestedNeeds"></small>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <label class="form-label"><i class="bi bi-virus text-danger me-1"></i>Enfermedades Contagiosas</label>
+                        <div class="border rounded p-3 bg-light" id="enfermedadesContainer" style="max-height:150px;overflow-y:auto">
+                            <div class="text-muted small">Cargando enfermedades...</div>
+                        </div>
+                    </div>
+                </div>
+                <hr class="my-4">
+                <div id="formAlert" class="alert d-none"></div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-guardar"><i class="bi bi-check-lg"></i> Guardar Paciente</button>
+                    <a href="/pacientes/" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Profile Edit Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-gear me-2"></i>Editar Perfil</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="profileForm" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div id="profileError" class="alert alert-danger d-none"></div>
+                        <div id="profileSuccess" class="alert alert-success d-none"></div>
+                        <div class="text-center mb-3">
+                            <label for="profilePictureInput" style="cursor:pointer">
+                                <div class="position-relative d-inline-block">
+                                    <img id="profilePreview" src="" class="rounded-circle" style="width:100px;height:100px;object-fit:cover;border:3px solid #0c4a6e">
+                                    <div class="position-absolute bottom-0 end-0 bg-primary rounded-circle p-2">
+                                        <i class="bi bi-camera-fill text-white small"></i>
+                                    </div>
+                                </div>
+                            </label>
+                            <input type="file" id="profilePictureInput" name="profile_picture" accept="image/*" class="d-none">
+                            <div class="small text-muted mt-1">Haz clic para cambiar foto</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="profileFirstName" name="first_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="profileLastName" name="last_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo</label>
+                                <input type="email" class="form-control" id="profileEmail" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rol</label>
+                                <input type="text" class="form-control" id="profileRole" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de nacimiento</label>
+                                <input type="date" class="form-control" id="profileDob" name="date_of_birth">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="profileSaveBtn">
+                            <i class="bi bi-check-lg"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+        const isEdit = {{ paciente_id|yesno:"true,false" }};
+
+        const imcClasses = [
+            { max: 18.5, label: 'Bajo peso', color: '#f59e0b', icon: 'bi-arrow-down-circle' },
+            { max: 24.9, label: 'Normal', color: '#10b981', icon: 'bi-check-circle' },
+            { max: 29.9, label: 'Sobrepeso', color: '#f97316', icon: 'bi-exclamation-circle' },
+            { max: 40, label: 'Obesidad', color: '#ef4444', icon: 'bi-exclamation-triangle-fill' },
+            { max: Infinity, label: 'Obesidad extrema', color: '#7f1d1d', icon: 'bi-biohazard' },
+        ];
+
+        function calcIMC() {
+            const peso = parseFloat(document.getElementById('peso').value);
+            const altura = parseFloat(document.getElementById('altura').value);
+            const badge = document.getElementById('imcBadge');
+            if (peso > 0 && altura > 0) {
+                const imc = peso / (altura * altura);
+                const val = imc.toFixed(1);
+                document.getElementById('imc_display').value = val;
+                document.getElementById('IMC').value = val;
+                const cls = imcClasses.find(c => imc < c.max) || imcClasses[imcClasses.length-1];
+                badge.innerHTML = `<i class="bi ${cls.icon} me-1"></i>${cls.label}`;
+                badge.style.background = cls.color + '20';
+                badge.style.color = cls.color;
+                badge.style.border = '1px solid ' + cls.color;
+            } else {
+                document.getElementById('imc_display').value = '';
+                document.getElementById('IMC').value = '';
+                badge.innerHTML = 'Esperando datos...';
+                badge.style.background = '';
+                badge.style.color = '';
+                badge.style.border = '';
+            }
+        }
+
+        function toggleEstadoFields() {
+            const estado = document.getElementById('estado').value;
+            document.getElementById('fechaAltaGroup').style.display = estado === 'Dado de Alta' ? '' : 'none';
+            document.getElementById('fechaFallecimientoGroup').style.display = estado === 'Fallecido' ? '' : 'none';
+        }
+
+        function togglePiso() {
+            const ubi = document.getElementById('ubicacion').value;
+            document.getElementById('piso').disabled = ubi === 'Consulta Externa';
+            if (ubi === 'Consulta Externa') document.getElementById('piso').value = '';
+        }
+
+        const needsByRiesgo = {
+            'Crítico': 'Oxígeno suplementario, Monitoreo constante de signos vitales, Cambio de suero cada 8h, Medicación IV, Aspiración de secreciones, Control de presión arterial cada hora',
+            'Alto': 'Oxígeno por cánula nasal, Medicación oral/IV, Control de glucosa cada 4h, Cambio de suero cada 12h, Reposo en cama',
+            'Medio': 'Medicación oral, Control de signos vitales cada 6h, Deambulación asistida, Dieta controlada',
+            'Bajo': 'Seguimiento ambulatorio, Medicación oral según indicación, Control de peso semanal, Actividad física moderada',
+        };
+
+        function suggestNeeds() {
+            const riesgo = document.getElementById('riesgo_enfermedad').value;
+            const el = document.getElementById('suggestedNeeds');
+            const ta = document.getElementById('necesidades_cuidado');
+            if (riesgo && needsByRiesgo[riesgo]) {
+                el.innerHTML = `<span class="text-info"><i class="bi bi-lightbulb"></i> Sugerido para riesgo <strong>${riesgo}</strong>: ${needsByRiesgo[riesgo]}</span>`;
+                if (!ta.value || ta.dataset.auto === 'true') {
+                    ta.value = needsByRiesgo[riesgo];
+                    ta.dataset.auto = 'true';
+                }
+            } else {
+                el.innerHTML = '';
+            }
+        }
+
+        document.getElementById('riesgo_enfermedad').addEventListener('change', suggestNeeds);
+        document.getElementById('necesidades_cuidado').addEventListener('input', function() {
+            this.dataset.auto = 'false';
+        });
+
+        let allEnfermedades = [];
+
+        async function loadEnfermedades() {
+            try {
+                const r = await fetch(`${API}/api/enfermedades-contagiosas/`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                if (r.status === 401) { window.location.href = '/login/'; return; }
+                allEnfermedades = await r.json();
+                const container = document.getElementById('enfermedadesContainer');
+                container.innerHTML = allEnfermedades.map(e =>
+                    `<div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="enf_${e.id}" value="${e.id}">
+                        <label class="form-check-label" for="enf_${e.id}">${e.nombre}</label>
+                    </div>`
+                ).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadPatient() {
+            if (!isEdit) return;
+            const id = document.getElementById('pacienteId').value;
+            try {
+                const r = await fetch(`${API}/api/pacientes/${id}/`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                if (r.status === 401) { window.location.href = '/login/'; return; }
+                const p = await r.json();
+                Object.keys(p).forEach(key => {
+                    const el = document.getElementById(key);
+                    if (el !== null && key !== 'enfermedades_contagiosas') {
+                        if (el.type === 'date' && p[key]) {
+                            el.value = p[key].split('T')[0];
+                        } else {
+                            el.value = p[key] || '';
+                        }
+                    }
+                });
+                if (p.estado) { document.getElementById('estado').value = p.estado; toggleEstadoFields(); }
+                if (p.ubicacion) { document.getElementById('ubicacion').value = p.ubicacion; togglePiso(); }
+                if (p.piso) { document.getElementById('piso').value = p.piso; }
+                if (p.necesidades_cuidado) {
+                    document.getElementById('necesidades_cuidado').value = p.necesidades_cuidado;
+                    document.getElementById('necesidades_cuidado').dataset.auto = 'false';
+                }
+                if (p.IMC) { document.getElementById('imc_display').value = p.IMC; calcIMC(); }
+                if (p.enfermedades_contagiosas && allEnfermedades.length) {
+                    p.enfermedades_contagiosas.forEach(id => {
+                        const cb = document.getElementById(`enf_${id}`);
+                        if (cb) cb.checked = true;
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        document.getElementById('pacienteForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const alert = document.getElementById('formAlert');
+            alert.classList.add('d-none');
+
+            const checkedEnf = Array.from(document.querySelectorAll('#enfermedadesContainer input:checked')).map(cb => parseInt(cb.value));
+
+            const data = {
+                id_paciente: document.getElementById('id_paciente').value,
+                nombres: document.getElementById('nombres').value,
+                apellidos: document.getElementById('apellidos').value,
+                edad: parseInt(document.getElementById('edad').value),
+                sexo: document.getElementById('sexo').value,
+                peso: parseFloat(document.getElementById('peso').value),
+                altura: parseFloat(document.getElementById('altura').value),
+                presion_sistolica: parseInt(document.getElementById('presion_sistolica').value),
+                presion_diastolica: parseInt(document.getElementById('presion_diastolica').value),
+                frecuencia_cardiaca: parseInt(document.getElementById('frecuencia_cardiaca').value),
+                glucosa: parseFloat(document.getElementById('glucosa').value),
+                colesterol: parseFloat(document.getElementById('colesterol').value),
+                saturacion_oxigeno: parseFloat(document.getElementById('saturacion_oxigeno').value),
+                temperatura: parseFloat(document.getElementById('temperatura').value),
+                antecedentes_familiares: document.getElementById('antecedentes_familiares').value,
+                fumador: document.getElementById('fumador').value,
+                consumo_alcohol: document.getElementById('consumo_alcohol').value,
+                actividad_fisica: document.getElementById('actividad_fisica').value,
+                diagnostico_preliminar: document.getElementById('diagnostico_preliminar').value,
+                riesgo_enfermedad: document.getElementById('riesgo_enfermedad').value,
+                estado: document.getElementById('estado').value,
+                ubicacion: document.getElementById('ubicacion').value,
+                piso: document.getElementById('piso').value ? parseInt(document.getElementById('piso').value) : null,
+                necesidades_cuidado: document.getElementById('necesidades_cuidado').value || '',
+                fecha_alta: document.getElementById('fecha_alta').value || null,
+                fecha_fallecimiento: document.getElementById('fecha_fallecimiento').value || null,
+                enfermedades_contagiosas: checkedEnf,
+                IMC: parseFloat(document.getElementById('IMC').value) || 0,
+                fecha_consulta: document.getElementById('fecha_consulta').value,
+            };
+
+            try {
+                const url = isEdit ? `${API}/api/pacientes/${document.getElementById('pacienteId').value}/` : `${API}/api/pacientes/`;
+                const method = isEdit ? 'PUT' : 'POST';
+
+                const r = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                    body: JSON.stringify(data)
+                });
+
+                if (r.status === 401) { window.location.href = '/login/'; return; }
+                if (r.status === 403) {
+                    alert.className = 'alert alert-danger';
+                    alert.textContent = 'No tienes permisos para realizar esta acción. Solo Administradores y Médicos pueden crear/editar pacientes.';
+                    alert.classList.remove('d-none');
+                    return;
+                }
+
+                const result = await r.json();
+                if (r.ok) {
+                    alert.className = 'alert alert-success';
+                    alert.textContent = isEdit ? 'Paciente actualizado correctamente' : 'Paciente creado correctamente';
+                    alert.classList.remove('d-none');
+                    setTimeout(() => window.location.href = '/pacientes/', 1500);
+                } else {
+                    alert.className = 'alert alert-danger';
+                    alert.textContent = Object.values(result).flat().join(', ') || 'Error al guardar';
+                    alert.classList.remove('d-none');
+                }
+            } catch(e) {
+                alert.className = 'alert alert-danger';
+                alert.textContent = 'Error de conexión';
+                alert.classList.remove('d-none');
+            }
+        });
+
+        // Profile modal - load data when opened
+        document.getElementById('profileModal').addEventListener('show.bs.modal', async function() {
+            const r = await fetch('/api/auth/csrf/');
+            const d = await r.json();
+            const res = await fetch('/api/auth/profile/', {
+                headers: { 'X-CSRFToken': d.csrfToken }
+            });
+            const data = await res.json();
+            if (data.email) {
+                document.getElementById('profileFirstName').value = data.first_name || '';
+                document.getElementById('profileLastName').value = data.last_name || '';
+                document.getElementById('profileEmail').value = data.email;
+                document.getElementById('profileRole').value = data.role;
+                document.getElementById('profileDob').value = data.date_of_birth || '';
+                const preview = document.getElementById('profilePreview');
+                if (data.profile_picture) {
+                    preview.src = data.profile_picture;
+                } else {
+                    preview.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(data.first_name || data.email) + '&background=0c4a6e&color=fff&size=100';
+                }
+            }
+        });
+
+        // Profile picture preview on file select
+        document.getElementById('profilePictureInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profilePreview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Profile form submit
+        document.getElementById('profileForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('profileSaveBtn');
+            const errorEl = document.getElementById('profileError');
+            const successEl = document.getElementById('profileSuccess');
+            errorEl.classList.add('d-none');
+            successEl.classList.add('d-none');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+
+            try {
+                const r = await fetch('/api/auth/csrf/');
+                const d = await r.json();
+                const formData = new FormData(this);
+                const res = await fetch('/api/auth/profile/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': d.csrfToken },
+                    body: formData
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    successEl.textContent = result.message;
+                    successEl.classList.remove('d-none');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    errorEl.textContent = result.error || 'Error al guardar';
+                    errorEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                errorEl.textContent = 'Error de conexión';
+                errorEl.classList.remove('d-none');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Guardar Cambios';
+        });
+
+        document.getElementById('logoutBtn').onclick = e => {
+            e.preventDefault();
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            fetch('/api/auth/session-logout/', { method: 'POST', credentials: 'include' });
+            window.location.href = '/login/';
+        };
+
+        if (!getToken()) window.location.href = '/login/';
+        loadEnfermedades().then(() => loadPatient());
+    </script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Predicciones</title>
+    <link rel="icon" href="/static/Icono.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; }
+        .sidebar { width: 260px; background: url('/static/Inicio.jpeg') no-repeat center center / cover; color: white; position: fixed; height: 100vh; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; margin: 0 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-ml { background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .metric-box { text-align: center; padding: 1.5rem; background: #f8fafc; border-radius: 0.75rem; }
+        .metric-value { font-size: 2rem; font-weight: 700; color: #0c4a6e; }
+        .metric-label { font-size: 0.85rem; color: #64748b; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/analytics/"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/" class="active"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-0"><i class="bi bi-magic text-primary me-2"></i>Machine Learning - Predicciones</h4>
+                <small class="text-muted">Modelo de predicción de riesgo de enfermedad</small>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-primary" id="trainModelBtn"><i class="bi bi-gear-fill"></i> Entrenar Modelo</button>
+                <button class="btn btn-success" id="predictAllBtn"><i class="bi bi-lightning-fill"></i> Predecir Todos</button>
+                <div class="vr"></div>
+                <a href="#" data-bs-toggle="modal" data-bs-target="#profileModal" class="text-decoration-none d-flex align-items-center gap-2">
+                    {% if user_profile_pic %}
+                        <img src="{{ user_profile_pic }}" class="rounded-circle" style="width:36px;height:36px;object-fit:cover">
+                    {% else %}
+                        <i class="bi bi-person-circle fs-4 text-primary"></i>
+                    {% endif %}
+                    <div class="text-end">
+                        <div class="fw-semibold small">{{ user_name }}</div>
+                        <small class="text-muted">{{ user_role }}</small>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="card-ml mb-4">
+            <div class="row g-3" id="metricsRow">
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="accuracyValue">-</div>
+                        <div class="metric-label">Accuracy</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="precisionValue">-</div>
+                        <div class="metric-label">Precision</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="recallValue">-</div>
+                        <div class="metric-label">Recall</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <div class="metric-value" id="f1Value">-</div>
+                        <div class="metric-label">F1-Score</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6"><div class="card-ml"><h6 class="fw-bold mb-3">Matriz de Confusión</h6><div id="confusionMatrix"></div></div></div>
+            <div class="col-md-6"><div class="card-ml"><h6 class="fw-bold mb-3">Distribución de Predicciones</h6><canvas id="prediccionChart"></canvas></div></div>
+        </div>
+
+        <div class="card-ml">
+            <h6 class="fw-bold mb-3"><i class="bi bi-table"></i> Últimas Predicciones</h6>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark"><tr><th>Paciente</th><th>Estado</th><th>Riesgo</th><th>Probabilidad</th><th>Modelo</th><th>Fecha</th></tr></thead>
+                    <tbody id="prediccionesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Edit Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-gear me-2"></i>Editar Perfil</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="profileForm" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div id="profileError" class="alert alert-danger d-none"></div>
+                        <div id="profileSuccess" class="alert alert-success d-none"></div>
+                        <div class="text-center mb-3">
+                            <label for="profilePictureInput" style="cursor:pointer">
+                                <div class="position-relative d-inline-block">
+                                    <img id="profilePreview" src="" class="rounded-circle" style="width:100px;height:100px;object-fit:cover;border:3px solid #0c4a6e">
+                                    <div class="position-absolute bottom-0 end-0 bg-primary rounded-circle p-2">
+                                        <i class="bi bi-camera-fill text-white small"></i>
+                                    </div>
+                                </div>
+                            </label>
+                            <input type="file" id="profilePictureInput" name="profile_picture" accept="image/*" class="d-none">
+                            <div class="small text-muted mt-1">Haz clic para cambiar foto</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="profileFirstName" name="first_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="profileLastName" name="last_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo</label>
+                                <input type="email" class="form-control" id="profileEmail" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rol</label>
+                                <input type="text" class="form-control" id="profileRole" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de nacimiento</label>
+                                <input type="date" class="form-control" id="profileDob" name="date_of_birth">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="profileSaveBtn">
+                            <i class="bi bi-check-lg"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        async function apiFetch(url, options = {}) {
+            const token = getToken();
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const r = await fetch(url, { ...options, headers });
+            if (r.status === 401) { window.location.href = '/login/'; return null; }
+            return r;
+        }
+
+        async function loadMetrics() {
+            const r = await apiFetch(`${API}/api/dashboard/kpis/`);
+            if (!r) return;
+            const data = await r.json();
+            if (data.modelo_metrics && data.modelo_metrics.accuracy) {
+                const m = data.modelo_metrics;
+                document.getElementById('accuracyValue').textContent = (m.accuracy * 100).toFixed(1) + '%';
+                document.getElementById('precisionValue').textContent = (m.precision * 100).toFixed(1) + '%';
+                document.getElementById('recallValue').textContent = (m.recall * 100).toFixed(1) + '%';
+                document.getElementById('f1Value').textContent = (m.f1_score * 100).toFixed(1) + '%';
+
+                if (m.confusion_matrix) {
+                    const cm = m.confusion_matrix;
+                    const classes = m.classes || ['Bajo','Medio','Alto','Crítico'];
+                    let html = '<table class="table table-bordered table-sm text-center"><thead><tr><th></th>';
+                    classes.forEach(c => html += `<th class="text-primary">${c}</th>`);
+                    html += '</tr></thead><tbody>';
+                    cm.forEach((row, i) => {
+                        html += `<tr><th class="text-primary">${classes[i] || i}</th>`;
+                        row.forEach(val => html += `<td>${val}</td>`);
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('confusionMatrix').innerHTML = html;
+                }
+            }
+
+            const r2 = await apiFetch(`${API}/api/predicciones/`);
+            if (!r2) return;
+            const preds = await r2.json();
+            const predsList = Array.isArray(preds) ? preds : (preds.results || []);
+            const tbody = document.getElementById('prediccionesBody');
+            const c = {'Bajo':'bg-success','Medio':'bg-warning text-dark','Alto':'bg-orange','Crítico':'bg-danger'};
+            const estadoIcon = {'Activo':'bi-person-check-fill text-success','Hospitalizado':'bi-hospital-fill text-warning','Dado de Alta':'bi-house-check-fill text-info','Fallecido':'bi-heartbreak-fill text-secondary'};
+            tbody.innerHTML = predsList.slice(0, 20).map(p => {
+                const esCriticoContagioso = p.riesgo_predicho === 'Crítico' && p.enfermedades_contagiosas && p.enfermedades_contagiosas.length > 0;
+                return `
+                <tr>
+                    <td>${p.paciente_nombre || p.paciente}</td>
+                    <td><span class="badge bg-light text-dark border"><i class="bi ${estadoIcon[p.estado] || 'bi-question-circle'} me-1"></i>${p.estado || 'Activo'}</span></td>
+                    <td>
+                        <span class="badge ${c[p.riesgo_predicho] || 'bg-secondary'}">${p.riesgo_predicho}</span>
+                        ${esCriticoContagioso ? '<span class="badge bg-danger ms-1"><i class="bi bi-virus me-1"></i>Contagioso</span>' : ''}
+                    </td>
+                    <td>${(p.probabilidad * 100).toFixed(1)}%</td>
+                    <td>${p.modelo}</td>
+                    <td>${new Date(p.created_at).toLocaleDateString()}</td>
+                </tr>
+            `}).join('') || '<tr><td colspan="6" class="text-muted">Sin predicciones. Ejecute el modelo.</td></tr>';
+
+            if (predsList.length) {
+                const riesgoCount = {};
+                predsList.forEach(p => { riesgoCount[p.riesgo_predicho] = (riesgoCount[p.riesgo_predicho] || 0) + 1; });
+                const colores = {'Bajo':'#10b981','Medio':'#f59e0b','Alto':'#f97316','Crítico':'#ef4444'};
+                new Chart(document.getElementById('prediccionChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(riesgoCount),
+                        datasets: [{ data: Object.values(riesgoCount), backgroundColor: Object.keys(riesgoCount).map(k => colores[k] || '#64748b') }]
+                    },
+                    options: { plugins: { legend: { display: false } } }
+                });
+            }
+        }
+
+        document.getElementById('trainModelBtn').onclick = async function() {
+            this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrenando...';
+            try {
+                const r = await apiFetch(`${API}/api/ml/train/`, { method: 'POST', body: '{}' });
+                if (r) { const data = await r.json(); alert(data.message || 'Modelo entrenado'); loadMetrics(); }
+            } catch(e) { alert('Error al entrenar'); }
+            this.disabled = false; this.innerHTML = '<i class="bi bi-gear-fill"></i> Entrenar Modelo';
+        };
+
+        document.getElementById('predictAllBtn').onclick = async function() {
+            this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Prediciendo...';
+            try {
+                const r = await apiFetch(`${API}/api/ml/predict/`, { method: 'POST', body: '{}' });
+                if (r) { const data = await r.json(); alert(`Predicciones generadas: ${data.predictions?.length || 0}`); loadMetrics(); }
+            } catch(e) { alert('Error al predecir'); }
+            this.disabled = false; this.innerHTML = '<i class="bi bi-lightning-fill"></i> Predecir Todos';
+        };
+
+        // Profile modal - load data when opened
+        document.getElementById('profileModal').addEventListener('show.bs.modal', async function() {
+            const r = await fetch('/api/auth/csrf/');
+            const d = await r.json();
+            const res = await fetch('/api/auth/profile/', {
+                headers: { 'X-CSRFToken': d.csrfToken }
+            });
+            const data = await res.json();
+            if (data.email) {
+                document.getElementById('profileFirstName').value = data.first_name || '';
+                document.getElementById('profileLastName').value = data.last_name || '';
+                document.getElementById('profileEmail').value = data.email;
+                document.getElementById('profileRole').value = data.role;
+                document.getElementById('profileDob').value = data.date_of_birth || '';
+                const preview = document.getElementById('profilePreview');
+                if (data.profile_picture) {
+                    preview.src = data.profile_picture;
+                } else {
+                    preview.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(data.first_name || data.email) + '&background=0c4a6e&color=fff&size=100';
+                }
+            }
+        });
+
+        // Profile picture preview on file select
+        document.getElementById('profilePictureInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profilePreview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Profile form submit
+        document.getElementById('profileForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('profileSaveBtn');
+            const errorEl = document.getElementById('profileError');
+            const successEl = document.getElementById('profileSuccess');
+            errorEl.classList.add('d-none');
+            successEl.classList.add('d-none');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+
+            try {
+                const r = await fetch('/api/auth/csrf/');
+                const d = await r.json();
+                const formData = new FormData(this);
+                const res = await fetch('/api/auth/profile/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': d.csrfToken },
+                    body: formData
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    successEl.textContent = result.message;
+                    successEl.classList.remove('d-none');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    errorEl.textContent = result.error || 'Error al guardar';
+                    errorEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                errorEl.textContent = 'Error de conexión';
+                errorEl.classList.remove('d-none');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Guardar Cambios';
+        });
+
+        document.getElementById('logoutBtn').onclick = e => { e.preventDefault(); localStorage.removeItem('access_token'); window.location.href = '/login/'; };
+
+        loadMetrics();
+    </script>
+</body>
+</html>

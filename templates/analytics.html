@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAnalytics IPS - Analítica</title>
+    <link rel="icon" href="/static/Icono.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; }
+        .sidebar { width: 260px; background: url('/static/Inicio.jpeg') no-repeat center center / cover; color: white; position: fixed; height: 100vh; }
+        .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item a { color: rgba(255,255,255,0.8); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; margin: 0 0.5rem; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.15); color: white; }
+        .main-content { margin-left: 260px; flex: 1; padding: 1.5rem; }
+        .card-analytics { background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stat-table th { background: #0c4a6e; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><i class="bi bi-heart-pulse-fill" style="font-size:2.5rem"></i><h5 class="text-white mt-2">HealthAnalytics</h5></div>
+        <div class="nav-item"><a href="/dashboard/"><i class="bi bi-grid-fill"></i> Dashboard</a></div>
+        <div class="nav-item"><a href="/pacientes/"><i class="bi bi-people-fill"></i> Pacientes</a></div>
+        <div class="nav-item"><a href="/analytics/" class="active"><i class="bi bi-bar-chart-fill"></i> Analítica</a></div>
+        <div class="nav-item"><a href="/predicciones/"><i class="bi bi-magic"></i> Predicciones</a></div>
+        <div class="nav-item"><a href="/reportes/"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a></div>
+        <hr style="border-color:rgba(255,255,255,0.1)">
+        <div class="nav-item"><a href="#" id="logoutBtn" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></div>
+    </div>
+
+    <div class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold mb-0"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Analítica de Datos</h4>
+            <div class="d-flex align-items-center gap-3">
+                <a href="#" data-bs-toggle="modal" data-bs-target="#profileModal" class="text-decoration-none d-flex align-items-center gap-2">
+                    {% if user_profile_pic %}
+                        <img src="{{ user_profile_pic }}" class="rounded-circle" style="width:36px;height:36px;object-fit:cover">
+                    {% else %}
+                        <i class="bi bi-person-circle fs-4 text-primary"></i>
+                    {% endif %}
+                    <div class="text-end">
+                        <div class="fw-semibold small">{{ user_name }}</div>
+                        <small class="text-muted">{{ user_role }}</small>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="card-analytics mb-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-table"></i> Estadísticas Descriptivas</h6>
+            <div class="table-responsive">
+                <table class="table table-bordered stat-table" id="statsTable">
+                    <thead><tr><th>Variable</th><th>Media</th><th>Mediana</th><th>Moda</th><th>Desv. Estándar</th><th>Mín</th><th>Máx</th></tr></thead>
+                    <tbody id="statsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> Distribución por Edad</h6><canvas id="edadChartAnalytics"></canvas></div></div>
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-pie-chart"></i> Distribución por Riesgo</h6><canvas id="riesgoChartAnalytics"></canvas></div></div>
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> Distribución por IMC</h6><canvas id="imcChartAnalytics"></canvas></div></div>
+            <div class="col-md-6"><div class="card-analytics"><h6 class="fw-bold mb-3"><i class="bi bi-graph-up"></i> Tendencias de Glucosa</h6><canvas id="glucosaChartAnalytics"></canvas></div></div>
+        </div>
+    </div>
+
+    <!-- Profile Edit Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-gear me-2"></i>Editar Perfil</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="profileForm" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div id="profileError" class="alert alert-danger d-none"></div>
+                        <div id="profileSuccess" class="alert alert-success d-none"></div>
+                        <div class="text-center mb-3">
+                            <label for="profilePictureInput" style="cursor:pointer">
+                                <div class="position-relative d-inline-block">
+                                    <img id="profilePreview" src="" class="rounded-circle" style="width:100px;height:100px;object-fit:cover;border:3px solid #0c4a6e">
+                                    <div class="position-absolute bottom-0 end-0 bg-primary rounded-circle p-2">
+                                        <i class="bi bi-camera-fill text-white small"></i>
+                                    </div>
+                                </div>
+                            </label>
+                            <input type="file" id="profilePictureInput" name="profile_picture" accept="image/*" class="d-none">
+                            <div class="small text-muted mt-1">Haz clic para cambiar foto</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="profileFirstName" name="first_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="profileLastName" name="last_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo</label>
+                                <input type="email" class="form-control" id="profileEmail" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rol</label>
+                                <input type="text" class="form-control" id="profileRole" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de nacimiento</label>
+                                <input type="date" class="form-control" id="profileDob" name="date_of_birth">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="profileSaveBtn">
+                            <i class="bi bi-check-lg"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = window.location.origin;
+        function getToken() { return localStorage.getItem('access_token'); }
+
+        async function loadAnalytics() {
+            try {
+                const r = await fetch(`${API}/api/dashboard/kpis/`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                if (r.status === 401) { window.location.href = '/login/'; return; }
+                const data = await r.json();
+
+                const stats = data.estadisticas || {};
+                const tbody = document.getElementById('statsBody');
+                tbody.innerHTML = Object.entries(stats).map(([key, val]) => `
+                    <tr>
+                        <td class="fw-semibold">${key}</td>
+                        <td>${val.media}</td>
+                        <td>${val.mediana}</td>
+                        <td>${val.moda}</td>
+                        <td>${val.desviacion}</td>
+                        <td>${val.min}</td>
+                        <td>${val.max}</td>
+                    </tr>
+                `).join('');
+
+                const seg = data.segmentos || {};
+                const tend = data.tendencias || {};
+
+                if (seg.por_edad) {
+                    new Chart(document.getElementById('edadChartAnalytics'), {
+                        type: 'bar',
+                        data: { labels: Object.keys(seg.por_edad), datasets: [{ data: Object.values(seg.por_edad), backgroundColor: '#0ea5e9' }] },
+                        options: { plugins: { legend: { display: false } } }
+                    });
+                }
+                if (seg.por_riesgo) {
+                    const c = {'Bajo':'#10b981','Medio':'#f59e0b','Alto':'#f97316','Crítico':'#ef4444'};
+                    new Chart(document.getElementById('riesgoChartAnalytics'), {
+                        type: 'pie',
+                        data: { labels: Object.keys(seg.por_riesgo), datasets: [{ data: Object.values(seg.por_riesgo), backgroundColor: Object.keys(seg.por_riesgo).map(k=>c[k]||'#64748b') }] }
+                    });
+                }
+                if (seg.por_imc) {
+                    new Chart(document.getElementById('imcChartAnalytics'), {
+                        type: 'bar',
+                        data: { labels: Object.keys(seg.por_imc), datasets: [{ data: Object.values(seg.por_imc), backgroundColor: ['#10b981','#0ea5e9','#f59e0b','#f97316','#ef4444'] }] },
+                        options: { plugins: { legend: { display: false } } }
+                    });
+                }
+                if (tend.glucosa) {
+                    new Chart(document.getElementById('glucosaChartAnalytics'), {
+                        type: 'line',
+                        data: { labels: Object.keys(tend.glucosa), datasets: [{ data: Object.values(tend.glucosa), borderColor: '#0ea5e9', fill: true, backgroundColor: 'rgba(14,165,233,0.1)', tension: 0.4 }] },
+                        options: { plugins: { legend: { display: false } } }
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // Profile modal - load data when opened
+        document.getElementById('profileModal').addEventListener('show.bs.modal', async function() {
+            const r = await fetch('/api/auth/csrf/');
+            const d = await r.json();
+            const res = await fetch('/api/auth/profile/', {
+                headers: { 'X-CSRFToken': d.csrfToken }
+            });
+            const data = await res.json();
+            if (data.email) {
+                document.getElementById('profileFirstName').value = data.first_name || '';
+                document.getElementById('profileLastName').value = data.last_name || '';
+                document.getElementById('profileEmail').value = data.email;
+                document.getElementById('profileRole').value = data.role;
+                document.getElementById('profileDob').value = data.date_of_birth || '';
+                const preview = document.getElementById('profilePreview');
+                if (data.profile_picture) {
+                    preview.src = data.profile_picture;
+                } else {
+                    preview.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(data.first_name || data.email) + '&background=0c4a6e&color=fff&size=100';
+                }
+            }
+        });
+
+        // Profile picture preview on file select
+        document.getElementById('profilePictureInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profilePreview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Profile form submit
+        document.getElementById('profileForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('profileSaveBtn');
+            const errorEl = document.getElementById('profileError');
+            const successEl = document.getElementById('profileSuccess');
+            errorEl.classList.add('d-none');
+            successEl.classList.add('d-none');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+
+            try {
+                const r = await fetch('/api/auth/csrf/');
+                const d = await r.json();
+                const formData = new FormData(this);
+                const res = await fetch('/api/auth/profile/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': d.csrfToken },
+                    body: formData
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    successEl.textContent = result.message;
+                    successEl.classList.remove('d-none');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    errorEl.textContent = result.error || 'Error al guardar';
+                    errorEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                errorEl.textContent = 'Error de conexión';
+                errorEl.classList.remove('d-none');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Guardar Cambios';
+        });
+
+        document.getElementById('logoutBtn').onclick = e => { e.preventDefault(); localStorage.removeItem('access_token'); window.location.href = '/login/'; };
+
+        loadAnalytics();
+    </script>
+</body>
+</html>
