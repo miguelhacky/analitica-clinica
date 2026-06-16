@@ -33,6 +33,34 @@ def send_email_brevo(subject, html_content, to_email):
         logger.error(f"Error sending email: {e}")
 
 
+@csrf_exempt
+def test_email(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    try:
+        if not settings.BREVO_API_KEY:
+            return JsonResponse({'success': False, 'error': 'BREVO_API_KEY no está configurada en las variables de entorno'})
+        config = sib_api_v3_sdk.Configuration()
+        config.api_key['api-key'] = settings.BREVO_API_KEY
+        api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(config))
+        data = json.loads(request.body)
+        to_email = data.get('email', settings.BREVO_SMTP_USER)
+        sender = {'email': settings.BREVO_SMTP_USER, 'name': 'HealthAnalytics IPS'}
+        to = [{'email': to_email}]
+        api.send_transac_email(
+            sib_api_v3_sdk.SendSmtpEmail(
+                sender=sender, to=to,
+                subject='Prueba - HealthAnalytics IPS',
+                html_content='<h2>Correo de prueba</h2><p>Si recibes esto, la integración con Brevo funciona correctamente.</p>'
+            )
+        )
+        return JsonResponse({'success': True, 'message': f'Correo de prueba enviado a {to_email}'})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
