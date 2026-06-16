@@ -22,7 +22,7 @@ if os.environ.get('VERCEL'):
             print("Admin exists", flush=True)
         from core.models import Paciente
         if Paciente.objects.count() == 0:
-            fixture_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data_fixture.json.gz')
+            fixture_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data_fixture.json')
             if os.path.exists(fixture_path):
                 call_command('loaddata', fixture_path)
                 print("Fixture loaded", flush=True)
