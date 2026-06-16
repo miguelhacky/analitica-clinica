@@ -142,6 +142,7 @@ def csrf_token(request):
     return JsonResponse({'csrfToken': get_token(request)})
 
 
+@csrf_exempt
 def profile_view(request):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'No autenticado'}, status=401)
