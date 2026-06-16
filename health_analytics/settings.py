@@ -60,9 +60,16 @@ WSGI_APPLICATION = 'health_analytics.wsgi.application'
 import dj_database_url
 
 _db_url = os.getenv('DATABASE_URL', '') or os.getenv('POSTGRES_URL_NON_POOLING', '')
+if not _db_url:
+    _pguser = os.getenv('PGUSER') or os.getenv('POSTGRES_USER') or ''
+    _pgpass = os.getenv('PGPASSWORD') or os.getenv('POSTGRES_PASSWORD') or ''
+    _pghost = os.getenv('PGHOST') or os.getenv('POSTGRES_HOST') or ''
+    _pgdb = os.getenv('PGDATABASE') or os.getenv('POSTGRES_DATABASE') or ''
+    _pgport = os.getenv('PGPORT', '5432')
+    if _pguser and _pgpass and _pghost and _pgdb:
+        _db_url = f'postgres://{_pguser}:{_pgpass}@{_pghost}:{_pgport}/{_pgdb}'
 if _db_url:
-    DATABASES = {'default': dj_database_url.config(default=_db_url, conn_max_age=600)}
-    DATABASES['default']['CONN_MAX_AGE'] = 60
+    DATABASES = {'default': dj_database_url.config(default=_db_url, conn_max_age=60)}
 else:
     DATABASES = {
         'default': {
