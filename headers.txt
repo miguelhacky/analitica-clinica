@@ -1,0 +1,14 @@
+HTTP/1.1 500 Internal Server Error
+Cache-Control: public, max-age=0, must-revalidate
+Content-Length: 145
+Content-Type: text/html; charset=utf-8
+Cross-Origin-Opener-Policy: same-origin
+Date: Tue, 16 Jun 2026 03:44:09 GMT
+Referrer-Policy: same-origin
+Server: Vercel
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Vercel-Cache: MISS
+X-Vercel-Id: iad1::iad1::xnl7n-1781581449430-fa8cd59fb6c9
+

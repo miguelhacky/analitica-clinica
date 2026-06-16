@@ -17,7 +17,7 @@ class Command(BaseCommand):
                     password='admin1234',
                     first_name='Admin',
                     last_name='Principal',
-                    role='admin'
+                    role='Administrador'
                 )
                 self.stdout.write(self.style.SUCCESS('Admin user created'))
             else:
