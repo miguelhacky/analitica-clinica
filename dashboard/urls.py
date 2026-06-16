@@ -25,4 +25,5 @@ urlpatterns = [
     path('api/auth/profile/', views.profile_view, name='profile'),
     path('api/setup/', views.setup_database, name='setup-database'),
     path('api/test-email/', views.test_email, name='test-email'),
+    path('api/media/<path:path>', views.serve_media, name='serve-media'),
 ]

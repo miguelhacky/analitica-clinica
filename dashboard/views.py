@@ -166,9 +166,14 @@ def profile_view(request):
             from datetime import datetime
             user.date_of_birth = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date()
         if request.FILES.get('profile_picture'):
+            import os as os_mod
+            os_mod.makedirs(settings.MEDIA_ROOT, exist_ok=True)
             user.profile_picture = request.FILES['profile_picture']
-        user.save()
-        return JsonResponse({'success': True, 'message': 'Perfil actualizado'})
+        try:
+            user.save()
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Error al guardar: {str(e)}'}, status=500)
+        return JsonResponse({'success': True, 'message': 'Perfil actualizado', 'profile_picture': user.profile_picture.url if user.profile_picture else None})
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
@@ -280,3 +285,10 @@ def setup_database(request):
     except Exception as e:
         import traceback
         return JsonResponse({'success': False, 'error': str(e), 'traceback': traceback.format_exc(), 'steps': steps})
+
+
+from django.views.static import serve as serve_static
+
+@login_required
+def serve_media(request, path):
+    return serve_static(request, path, document_root=settings.MEDIA_ROOT)
