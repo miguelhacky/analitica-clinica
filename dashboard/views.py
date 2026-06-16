@@ -219,3 +219,35 @@ def password_reset_change(request):
         except (User.DoesNotExist, PasswordResetCode.DoesNotExist):
             return JsonResponse({'success': False, 'error': 'Código inválido o expirado'}, status=400)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+def setup_database(request):
+    from django.core.management import call_command
+    import io
+    output = io.StringIO()
+    steps = []
+    try:
+        call_command('migrate', '--noinput', stdout=output)
+        steps.append("Migrate OK")
+        if not User.objects.filter(email='admin@gmail.com').exists():
+            User.objects.create_superuser(
+                email='admin@gmail.com', password='admin1234',
+                first_name='Admin', last_name='Principal', role='Administrador'
+            )
+            steps.append("Admin created")
+        else:
+            steps.append("Admin exists")
+        from core.models import Paciente
+        if Paciente.objects.count() == 0:
+            fixture_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data_fixture.json')
+            if os.path.exists(fixture_path):
+                call_command('loaddata', fixture_path, stdout=output)
+                steps.append("Fixture loaded")
+            else:
+                steps.append(f"Fixture not found at {fixture_path}")
+        else:
+            steps.append(f"Data exists ({Paciente.objects.count()} patients)")
+        return JsonResponse({'success': True, 'steps': steps})
+    except Exception as e:
+        import traceback
+        return JsonResponse({'success': False, 'error': str(e), 'traceback': traceback.format_exc(), 'steps': steps})
