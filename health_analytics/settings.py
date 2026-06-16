@@ -59,9 +59,10 @@ WSGI_APPLICATION = 'health_analytics.wsgi.application'
 
 import dj_database_url
 
-_db_url = os.getenv('DATABASE_URL', '')
+_db_url = os.getenv('DATABASE_URL', '') or os.getenv('POSTGRES_URL_NON_POOLING', '')
 if _db_url:
     DATABASES = {'default': dj_database_url.config(default=_db_url, conn_max_age=600)}
+    DATABASES['default']['CONN_MAX_AGE'] = 60
 else:
     DATABASES = {
         'default': {
