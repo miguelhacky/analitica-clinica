@@ -8,3 +8,5 @@ media/profiles/
 .DS_Store
 Thumbs.db
 .env
+.vercel
+staticfiles/
