@@ -95,7 +95,7 @@ def run_etl_view(request):
                 dest.write(chunk)
         result = run_etl(temp_path, user)
     else:
-        dataset_path = os.path.join(os.path.dirname(__file__), '..', 'media', 'dataset_clinico.xlsx')
+        dataset_path = '/tmp/dataset_clinico.xlsx'
         os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
         if not os.path.exists(dataset_path):
             generar_dataset(dataset_path, 1800)
