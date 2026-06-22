@@ -113,7 +113,7 @@ def train_model_view(request):
 
     success = predictor.train(pacientes, request.data.get('model_type', 'random_forest'))
     if success:
-        model_dir = os.path.join(os.path.dirname(__file__), '..', 'media', 'models')
+        model_dir = '/tmp/models'
         os.makedirs(model_dir, exist_ok=True)
         predictor.save_model(os.path.join(model_dir, 'clinical_model.joblib'))
         return Response({'message': 'Modelo entrenado', 'metrics': predictor.metrics})
@@ -128,7 +128,7 @@ def predict_all_view(request):
         return Response({'error': 'No hay pacientes'}, status=400)
 
     if predictor.model is None:
-        model_path = os.path.join(os.path.dirname(__file__), '..', 'media', 'models', 'clinical_model.joblib')
+        model_path = '/tmp/models/clinical_model.joblib'
         try:
             if os.path.exists(model_path):
                 predictor.load_model(model_path)
